@@ -101,16 +101,9 @@ class GenerarTituloEndpoint extends BaseEndpoint {
             $contextInjected = strlen($promptWithContext) > strlen($fullPrompt);
             error_log("Contexto de títulos inyectado: " . ($contextInjected ? 'SÍ (' . (strlen($promptWithContext) - strlen($fullPrompt)) . ' chars)' : 'NO'));
 
-            // En reintentos, añadir instrucción adicional MÁS FUERTE
+            // En reintentos, añadir advertencia
             if ($attempt > 1 && $lastSimilarityInfo) {
-                $promptWithContext .= "\n\n🚨 ADVERTENCIA CRÍTICA - INTENTO #{$attempt}:\n";
-                $promptWithContext .= "El título anterior fue RECHAZADO por similitud del {$lastSimilarityInfo['similarity_percent']}% con:\n";
-                $promptWithContext .= "\"" . $lastSimilarityInfo['similar_to'] . "\"\n\n";
-                $promptWithContext .= "DEBES generar un título RADICALMENTE DIFERENTE:\n";
-                $promptWithContext .= "- Usa palabras y verbos completamente distintos\n";
-                $promptWithContext .= "- Cambia totalmente la estructura y el orden\n";
-                $promptWithContext .= "- Enfoca desde una perspectiva diferente\n";
-                $promptWithContext .= "- Aplica sinónimos y variaciones\n";
+                $promptWithContext .= "\n\nWARNING - Attempt #{$attempt}: Previous title was rejected ({$lastSimilarityInfo['similarity_percent']}% similar to existing title). Generate a completely different title.\n";
             }
 
             // Parámetros optimizados (aumentar temperatura en reintentos)
