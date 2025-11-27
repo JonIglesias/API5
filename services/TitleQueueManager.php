@@ -136,6 +136,53 @@ class TitleQueueManager {
         foreach ($existingTitles as $existingTitle) {
             $existingNormalized = strtolower(trim($existingTitle));
 
+            // [NUEVO v4.21] Método 0: Detección de palabras iniciales comunes
+            // Si las primeras 2-3 palabras son idénticas o muy similares, rechazar
+            $newWords = preg_split('/[\s:]+/', $newTitleNormalized, 5);
+            $existingWords = preg_split('/[\s:]+/', $existingNormalized, 5);
+
+            // Método 0a: Detectar palabra única distintiva (>7 chars) en primeras 3 palabras
+            $newFirst3 = array_slice($newWords, 0, 3);
+            $existingFirst3 = array_slice($existingWords, 0, 3);
+
+            foreach ($newFirst3 as $newWord) {
+                if (strlen($newWord) > 7) { // Palabra distintiva (ej: "catacata")
+                    foreach ($existingFirst3 as $existingWord) {
+                        similar_text($newWord, $existingWord, $wordSim);
+                        if ($wordSim > 85) {
+                            // Palabra distintiva repetida al inicio
+                            return [
+                                'is_similar' => true,
+                                'similar_to' => $existingTitle,
+                                'similarity_percent' => round($wordSim, 2),
+                                'reason' => 'repeated_distinctive_word'
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Método 0b: Primeras 2-3 palabras significativas
+            $newStart = array_filter(array_slice($newWords, 0, 3), function($w) { return strlen($w) > 3; });
+            $existingStart = array_filter(array_slice($existingWords, 0, 3), function($w) { return strlen($w) > 3; });
+
+            if (count($newStart) >= 2 && count($existingStart) >= 2) {
+                $newStartStr = implode(' ', array_slice($newStart, 0, 2));
+                $existingStartStr = implode(' ', array_slice($existingStart, 0, 2));
+
+                similar_text($newStartStr, $existingStartStr, $startSimilarity);
+
+                // Si las primeras 2 palabras clave son >65% similares, rechazar
+                if ($startSimilarity > 65) {
+                    return [
+                        'is_similar' => true,
+                        'similar_to' => $existingTitle,
+                        'similarity_percent' => round($startSimilarity, 2),
+                        'reason' => 'common_start_words'
+                    ];
+                }
+            }
+
             // Método 1: similar_text (porcentaje de similitud)
             similar_text($newTitleNormalized, $existingNormalized, $percentSimilar);
             $percentSimilar = $percentSimilar / 100; // Convertir a 0-1
@@ -158,7 +205,8 @@ class TitleQueueManager {
                 return [
                     'is_similar' => true,
                     'similar_to' => $existingTitle,
-                    'similarity_percent' => round($similarity * 100, 2)
+                    'similarity_percent' => round($similarity * 100, 2),
+                    'reason' => 'overall_similarity'
                 ];
             }
         }
