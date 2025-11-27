@@ -136,22 +136,49 @@ class TitleQueueManager {
         foreach ($existingTitles as $existingTitle) {
             $existingNormalized = strtolower(trim($existingTitle));
 
-            // [NUEVO v4.21] Método 0: Detección de prefijo común (primeras 30 chars)
-            // Si los primeros 30 caracteres son >80% similares, rechazar
-            $prefixLength = min(30, min(strlen($newTitleNormalized), strlen($existingNormalized)));
-            if ($prefixLength > 15) { // Solo si hay suficiente texto
-                $newPrefix = substr($newTitleNormalized, 0, $prefixLength);
-                $existingPrefix = substr($existingNormalized, 0, $prefixLength);
+            // [NUEVO v4.21] Método 0: Detección de palabras iniciales comunes
+            // Si las primeras 2-3 palabras son idénticas o muy similares, rechazar
+            $newWords = preg_split('/[\s:]+/', $newTitleNormalized, 5);
+            $existingWords = preg_split('/[\s:]+/', $existingNormalized, 5);
 
-                similar_text($newPrefix, $existingPrefix, $prefixSimilarity);
+            // Método 0a: Detectar palabra única distintiva (>7 chars) en primeras 3 palabras
+            $newFirst3 = array_slice($newWords, 0, 3);
+            $existingFirst3 = array_slice($existingWords, 0, 3);
 
-                if ($prefixSimilarity > 80) {
-                    // Prefijo muy similar - rechazar inmediatamente
+            foreach ($newFirst3 as $newWord) {
+                if (strlen($newWord) > 7) { // Palabra distintiva (ej: "catacata")
+                    foreach ($existingFirst3 as $existingWord) {
+                        similar_text($newWord, $existingWord, $wordSim);
+                        if ($wordSim > 85) {
+                            // Palabra distintiva repetida al inicio
+                            return [
+                                'is_similar' => true,
+                                'similar_to' => $existingTitle,
+                                'similarity_percent' => round($wordSim, 2),
+                                'reason' => 'repeated_distinctive_word'
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Método 0b: Primeras 2-3 palabras significativas
+            $newStart = array_filter(array_slice($newWords, 0, 3), function($w) { return strlen($w) > 3; });
+            $existingStart = array_filter(array_slice($existingWords, 0, 3), function($w) { return strlen($w) > 3; });
+
+            if (count($newStart) >= 2 && count($existingStart) >= 2) {
+                $newStartStr = implode(' ', array_slice($newStart, 0, 2));
+                $existingStartStr = implode(' ', array_slice($existingStart, 0, 2));
+
+                similar_text($newStartStr, $existingStartStr, $startSimilarity);
+
+                // Si las primeras 2 palabras clave son >65% similares, rechazar
+                if ($startSimilarity > 65) {
                     return [
                         'is_similar' => true,
                         'similar_to' => $existingTitle,
-                        'similarity_percent' => round($prefixSimilarity, 2),
-                        'reason' => 'common_prefix'
+                        'similarity_percent' => round($startSimilarity, 2),
+                        'reason' => 'common_start_words'
                     ];
                 }
             }
