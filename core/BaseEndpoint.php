@@ -199,17 +199,12 @@ abstract class BaseEndpoint {
             return $prompt;
         }
 
-        // Construir sección de contexto
-        $contextSection = "\n\n---\n\n";
-        $contextSection .= "🚫 IMPORTANTE - TÍTULOS YA GENERADOS EN ESTA CAMPAÑA:\n";
-        $contextSection .= "NO repitas ni parafrasees estos títulos. Genera uno COMPLETAMENTE DIFERENTE:\n\n";
+        // Construir sección de contexto (minimalista)
+        $contextSection = "\n\n---\n\nPreviously generated titles:\n";
 
         foreach ($previousTitles as $index => $title) {
             $contextSection .= "- " . $title . "\n";
         }
-
-        $contextSection .= "\n❗ El nuevo título debe ser ÚNICO y DISTINTO a todos los anteriores.\n";
-        $contextSection .= "Usa variaciones en: estructura, enfoque, beneficio destacado, o perspectiva.\n";
 
         return $prompt . $contextSection;
     }
