@@ -2,14 +2,15 @@
 /**
  * Endpoint: Generar Título Individual
  *
- * FEATURES v4.17:
+ * FEATURES v4.18:
  * - Inyección dinámica de títulos previos de la cola (evita duplicados)
- * - Detección de similitud con Levenshtein + similar_text (umbral: 85%)
+ * - Detección de similitud con Levenshtein + similar_text (umbral: 75% - MÁS ESTRICTO)
  * - Sistema de reintentos si título es similar (máx: 3 intentos)
  * - Parámetros de temperatura optimizados para diversidad
  * - Auto-creación de tabla si no existe
  * - Limpieza automática de títulos >24h en cada request
  * - Almacenamiento de títulos en queue_titles para tracking
+ * - LOGS DE DEBUG EXTENSIVOS para troubleshooting
  */
 
 defined('API_ACCESS') or die('Direct access not permitted');
@@ -32,16 +33,31 @@ class GenerarTituloEndpoint extends BaseEndpoint {
         $keywordsSEO = $this->params['keywords_seo'] ?? [];
         $keywords = $this->params['keywords'] ?? [];
 
-        // [NUEVO v4.16] Campaign ID para tracking de cola
+        // Campaign ID para tracking de cola
         $campaignId = $this->params['campaign_id'] ?? null;
 
         if (!$prompt && !$topic) {
             Response::error('Prompt o topic es requerido', 400);
         }
 
-        // [NUEVO v4.17] Auto-limpieza de títulos antiguos al inicio de cada request
+        // DEBUG: Log campaign info
+        error_log("=== TitleGenerator START ===");
+        error_log("Campaign ID: " . ($campaignId ?: 'NULL (operación individual)'));
+        error_log("License ID: " . $this->license['id']);
+
+        // Auto-limpieza de títulos antiguos al inicio de cada request
         if ($campaignId) {
-            TitleQueueManager::autoCleanup(24);
+            $cleanupResult = TitleQueueManager::autoCleanup(24);
+            error_log("Auto-cleanup executed: " . ($cleanupResult ? 'OK' : 'FAILED'));
+        }
+
+        // DEBUG: Verificar cuántos títulos hay en la cola ANTES de generar
+        if ($campaignId) {
+            $previousTitles = TitleQueueManager::getTitles($campaignId, 50);
+            error_log("Títulos previos en cola: " . count($previousTitles));
+            if (!empty($previousTitles)) {
+                error_log("Últimos 3 títulos: " . implode(' | ', array_slice($previousTitles, 0, 3)));
+            }
         }
 
         // Cargar template base (archivo .md editable)
@@ -51,11 +67,7 @@ class GenerarTituloEndpoint extends BaseEndpoint {
         }
 
         // Preparar datos para las variables del template
-        // Template espera: {{company_description}}, {{title_prompt}}, {{keywords_seo}}
-
         $companyDescription = $companyDesc ?? '';
-
-        // El prompt del plugin (PluginTitlePrompt) se inserta en title_prompt
         $titlePrompt = $prompt ?? $topic ?? '';
 
         // Combinar keywords SEO
@@ -70,20 +82,35 @@ class GenerarTituloEndpoint extends BaseEndpoint {
             'keywords_seo' => $allKeywords
         ]);
 
-        // [NUEVO v4.17] Sistema de reintentos con detección de similitud
+        // [NUEVO v4.18] Umbral más estricto: 75% (antes 85%)
+        $similarityThreshold = 0.75;
+
+        // Sistema de reintentos con detección de similitud
         $maxAttempts = 3;
         $generatedTitle = null;
         $lastSimilarityInfo = null;
+        $debugInfo = [];
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            // Inyectar títulos previos (se actualiza en cada intento)
-            $promptWithContext = $this->appendQueueContext($fullPrompt, $campaignId, 10);
+            error_log("--- Intento #{$attempt}/{$maxAttempts} ---");
 
-            // En reintentos, añadir instrucción adicional
+            // Inyectar títulos previos (se actualiza en cada intento)
+            $promptWithContext = $this->appendQueueContext($fullPrompt, $campaignId, 15); // Aumentado a 15 títulos
+
+            // DEBUG: Verificar si se inyectó contexto
+            $contextInjected = strlen($promptWithContext) > strlen($fullPrompt);
+            error_log("Contexto de títulos inyectado: " . ($contextInjected ? 'SÍ (' . (strlen($promptWithContext) - strlen($fullPrompt)) . ' chars)' : 'NO'));
+
+            // En reintentos, añadir instrucción adicional MÁS FUERTE
             if ($attempt > 1 && $lastSimilarityInfo) {
-                $promptWithContext .= "\n\n⚠️ INTENTO #{$attempt}: El título anterior era muy similar a:\n";
-                $promptWithContext .= "\"" . $lastSimilarityInfo['similar_to'] . "\"\n";
-                $promptWithContext .= "Genera un título COMPLETAMENTE DIFERENTE en estructura, enfoque y palabras.\n";
+                $promptWithContext .= "\n\n🚨 ADVERTENCIA CRÍTICA - INTENTO #{$attempt}:\n";
+                $promptWithContext .= "El título anterior fue RECHAZADO por similitud del {$lastSimilarityInfo['similarity_percent']}% con:\n";
+                $promptWithContext .= "\"" . $lastSimilarityInfo['similar_to'] . "\"\n\n";
+                $promptWithContext .= "DEBES generar un título RADICALMENTE DIFERENTE:\n";
+                $promptWithContext .= "- Usa VERBOS DISTINTOS (no 'descubre', 'transforma', 'conviértete')\n";
+                $promptWithContext .= "- Cambia COMPLETAMENTE la estructura\n";
+                $promptWithContext .= "- Enfoca desde OTRA PERSPECTIVA\n";
+                $promptWithContext .= "- Usa SINÓNIMOS Y VARIACIONES\n";
             }
 
             // Parámetros optimizados (aumentar temperatura en reintentos)
@@ -92,9 +119,11 @@ class GenerarTituloEndpoint extends BaseEndpoint {
                 'prompt' => $promptWithContext,
                 'max_tokens' => 200,
                 'temperature' => min($temperature, 1.0),
-                'frequency_penalty' => 0.4 + (($attempt - 1) * 0.1), // 0.4 → 0.5 → 0.6
-                'presence_penalty' => 0.3
+                'frequency_penalty' => 0.5 + (($attempt - 1) * 0.1), // 0.5 → 0.6 → 0.7 (MÁS AGRESIVO)
+                'presence_penalty' => 0.4 // Aumentado de 0.3 a 0.4
             ];
+
+            error_log("OpenAI params: temp=" . $generationParams['temperature'] . ", freq_pen=" . $generationParams['frequency_penalty']);
 
             // Generar título
             $result = $this->openai->generateContent($generationParams);
@@ -104,41 +133,76 @@ class GenerarTituloEndpoint extends BaseEndpoint {
             }
 
             $generatedTitle = trim($result['content']);
+            error_log("Título generado: " . $generatedTitle);
 
-            // [NUEVO v4.17] Verificar similitud con títulos existentes
+            // Verificar similitud con títulos existentes
             if ($campaignId) {
-                $similarityCheck = TitleQueueManager::isSimilarToAny($campaignId, $generatedTitle, 0.85);
+                $similarityCheck = TitleQueueManager::isSimilarToAny($campaignId, $generatedTitle, $similarityThreshold);
+
+                error_log("Similitud check: " . ($similarityCheck['is_similar'] ? "RECHAZADO" : "ACEPTADO") . " - {$similarityCheck['similarity_percent']}% (umbral: " . ($similarityThreshold * 100) . "%)");
+
+                if ($similarityCheck['similar_to']) {
+                    error_log("Más similar a: " . $similarityCheck['similar_to']);
+                }
+
+                $debugInfo["attempt_{$attempt}"] = [
+                    'title' => $generatedTitle,
+                    'similarity_percent' => $similarityCheck['similarity_percent'],
+                    'is_similar' => $similarityCheck['is_similar'],
+                    'similar_to' => $similarityCheck['similar_to'],
+                    'temperature' => $generationParams['temperature'],
+                    'frequency_penalty' => $generationParams['frequency_penalty']
+                ];
 
                 if ($similarityCheck['is_similar']) {
                     // Título muy similar - reintentar si quedan intentos
                     $lastSimilarityInfo = $similarityCheck;
 
                     if ($attempt < $maxAttempts) {
-                        error_log("TitleGenerator: Título similar detectado (intento {$attempt}/{$maxAttempts}). Similitud: {$similarityCheck['similarity_percent']}%");
+                        error_log("→ REINTENTANDO... (similitud: {$similarityCheck['similarity_percent']}%)");
                         continue; // Reintentar
                     } else {
                         // Último intento - aceptar aunque sea similar
-                        error_log("TitleGenerator: Título similar en último intento. Similitud: {$similarityCheck['similarity_percent']}%. Aceptando...");
+                        error_log("→ ACEPTANDO en último intento (similitud: {$similarityCheck['similarity_percent']}%)");
                     }
                 }
             }
 
             // Título aceptado - salir del loop
+            error_log("→ TÍTULO ACEPTADO");
             break;
         }
 
         // Guardar título en la cola (si es parte de una campaña)
         if ($campaignId && $generatedTitle) {
-            TitleQueueManager::addTitle(
+            $saved = TitleQueueManager::addTitle(
                 $campaignId,
                 $this->license['id'],
                 $generatedTitle
             );
+            error_log("Título guardado en DB: " . ($saved ? 'OK' : 'FAILED'));
+
+            // Verificar que realmente se guardó
+            $titlesAfter = TitleQueueManager::getTitles($campaignId, 1);
+            error_log("Verificación guardado - Último título en DB: " . ($titlesAfter[0] ?? 'NINGUNO'));
         }
+
+        error_log("=== TitleGenerator END ===\n");
 
         // Trackear uso
         $this->trackUsage('title', $result);
 
-        Response::success(['title' => $generatedTitle]);
+        // [NUEVO v4.18] Incluir info de debug en respuesta (solo si hay campaignId)
+        $response = ['title' => $generatedTitle];
+
+        if ($campaignId && !empty($debugInfo)) {
+            $response['_debug'] = [
+                'attempts' => count($debugInfo),
+                'threshold' => ($similarityThreshold * 100) . '%',
+                'attempts_detail' => $debugInfo
+            ];
+        }
+
+        Response::success($response);
     }
 }
