@@ -1,0 +1,14 @@
+{
+    "last_run": "2025-11-27 13:30:06",
+    "sync_type": "recent",
+    "source": "cron",
+    "success": true,
+    "results": {
+        "created": 0,
+        "updated": 0,
+        "unchanged": 1,
+        "skipped": 0,
+        "errors": 0
+    },
+    "details": []
+}

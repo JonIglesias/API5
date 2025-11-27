@@ -1,0 +1,18 @@
+IMPORTANTE: SINCRONIZACIÓN DE PRECIOS
+
+El campo `price` en la tabla `api_plans` se actualiza automáticamente
+desde WooCommerce cuando:
+
+1. Se crea una suscripción (webhook subscription.created)
+2. Se actualiza una suscripción (webhook subscription.updated)
+3. Se sincroniza manualmente (CRON o admin)
+
+El precio se obtiene de:
+- $data['line_items'][0]['total'] (precio de la suscripción)
+- $data['currency'] (moneda)
+
+Y se actualiza en el plan correspondiente según:
+- woo_product_id
+
+NOTA: El precio inicial en este SQL es solo por defecto.
+Se sobrescribirá con los valores reales de WooCommerce.

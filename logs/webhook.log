@@ -1,0 +1,6 @@
+{"timestamp":"2025-11-27 11:44:20","level":"INFO","message":"Webhook request received","context":{"client_ip":"31.200.246.223","remote_addr":"31.200.246.223","forwarded_for":"none","user_agent":"WooCommerce\/10.3.5 Hookshot (WordPress\/6.8.3)","content_type":"application\/json"}}
+{"timestamp":"2025-11-27 11:44:20","level":"INFO","message":"Webhook received","context":{"event":"order.created","subscription_id":355}}
+{"timestamp":"2025-11-27 11:44:20","level":"INFO","message":"License created from order","context":{"license_key":"DEMO-2025-031EE4CC","order_id":355,"email":"correo@altamiraweb.net","plan":"demo"}}
+{"timestamp":"2025-11-27 11:44:20","level":"INFO","message":"Webhook request received","context":{"client_ip":"31.200.246.223","remote_addr":"31.200.246.223","forwarded_for":"none","user_agent":"WooCommerce\/10.3.5 Hookshot (WordPress\/6.8.3)","content_type":"application\/json"}}
+{"timestamp":"2025-11-27 11:44:20","level":"INFO","message":"Webhook received","context":{"event":"order.updated","subscription_id":355}}
+{"timestamp":"2025-11-27 11:44:20","level":"INFO","message":"License updated from order","context":{"license_id":6,"order_id":355}}
