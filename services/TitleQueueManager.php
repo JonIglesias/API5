@@ -10,13 +10,15 @@
  * - Antes de generar un nuevo título, se consultan los títulos previos
  * - Los títulos previos se inyectan al prompt para evitar repeticiones
  *
- * CARACTERÍSTICAS:
+ * CARACTERÍSTICAS v4.17:
  * - Scope por campaign_id (colas independientes)
- * - Auto-limpieza: títulos >24h se eliminan automáticamente
+ * - Auto-creación de tabla si no existe
+ * - Limpieza automática en cada request (títulos >24h)
+ * - Detección de similitud con Levenshtein + similar_text
  * - Lightweight: solo almacena texto, sin embeddings
  *
  * @package AutoPostsAPI
- * @version 4.16
+ * @version 4.17
  */
 
 defined('API_ACCESS') or die('Direct access not permitted');
@@ -24,6 +26,149 @@ defined('API_ACCESS') or die('Direct access not permitted');
 require_once API_BASE_DIR . '/core/Database.php';
 
 class TitleQueueManager {
+
+    /**
+     * Auto-crear tabla si no existe
+     *
+     * Se ejecuta automáticamente en cada operación para asegurar
+     * que la tabla existe antes de usarla.
+     *
+     * @return bool True si la tabla existe o se creó correctamente
+     */
+    private static function ensureTableExists() {
+        $db = Database::getInstance();
+
+        try {
+            // Verificar si la tabla existe
+            $result = $db->fetchOne("
+                SHOW TABLES LIKE '" . DB_PREFIX . "queue_titles'
+            ");
+
+            if (!$result) {
+                // Crear tabla
+                $db->query("
+                    CREATE TABLE IF NOT EXISTS `" . DB_PREFIX . "queue_titles` (
+                      `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                      `campaign_id` VARCHAR(100) NOT NULL COMMENT 'ID de la campaña/cola',
+                      `license_id` INT UNSIGNED NOT NULL COMMENT 'ID de la licencia propietaria',
+                      `title_text` VARCHAR(500) NOT NULL COMMENT 'Texto del título generado',
+                      `created_at` DATETIME NOT NULL COMMENT 'Fecha de generación',
+                      PRIMARY KEY (`id`),
+                      KEY `campaign_lookup` (`campaign_id`, `created_at`),
+                      KEY `cleanup` (`created_at`),
+                      FOREIGN KEY (`license_id`) REFERENCES `" . DB_PREFIX . "licenses`(`id`) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    COMMENT='Almacenamiento temporal de títulos generados en colas. TTL: 24 horas'
+                ");
+
+                error_log("TitleQueueManager: Table created successfully");
+            }
+
+            return true;
+
+        } catch (Exception $e) {
+            error_log("TitleQueueManager: Error ensuring table exists - " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Limpieza automática de títulos antiguos (>24h)
+     *
+     * Se ejecuta automáticamente en cada request de una nueva cola
+     * para mantener la tabla limpia sin depender únicamente del event scheduler.
+     *
+     * @param int $hoursOld Antigüedad en horas (default: 24)
+     * @return bool True si la limpieza fue exitosa
+     */
+    public static function autoCleanup($hoursOld = 24) {
+        self::ensureTableExists();
+
+        $db = Database::getInstance();
+
+        try {
+            $db->query("
+                DELETE FROM " . DB_PREFIX . "queue_titles
+                WHERE created_at < DATE_SUB(NOW(), INTERVAL ? HOUR)
+            ", [(int)$hoursOld]);
+
+            return true;
+
+        } catch (Exception $e) {
+            error_log("TitleQueueManager: Error during auto-cleanup - " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Verificar si un título es similar a alguno existente en la cola
+     *
+     * Usa dos métodos de detección:
+     * 1. Levenshtein distance (distancia de edición)
+     * 2. similar_text (porcentaje de similitud)
+     *
+     * Un título se considera similar si:
+     * - Similitud > 85% usando similar_text, O
+     * - Distancia Levenshtein < 15% de la longitud del título
+     *
+     * @param string $campaignId ID de la campaña
+     * @param string $newTitle Nuevo título a verificar
+     * @param float $threshold Umbral de similitud (0-1, default: 0.85 = 85%)
+     * @return array ['is_similar' => bool, 'similar_to' => string|null, 'similarity_percent' => float]
+     */
+    public static function isSimilarToAny($campaignId, $newTitle, $threshold = 0.85) {
+        if (!$campaignId || !$newTitle) {
+            return ['is_similar' => false, 'similar_to' => null, 'similarity_percent' => 0];
+        }
+
+        self::ensureTableExists();
+
+        $existingTitles = self::getTitles($campaignId, 50); // Comparar con últimos 50
+
+        if (empty($existingTitles)) {
+            return ['is_similar' => false, 'similar_to' => null, 'similarity_percent' => 0];
+        }
+
+        $newTitleNormalized = strtolower(trim($newTitle));
+        $maxSimilarity = 0;
+        $mostSimilarTitle = null;
+
+        foreach ($existingTitles as $existingTitle) {
+            $existingNormalized = strtolower(trim($existingTitle));
+
+            // Método 1: similar_text (porcentaje de similitud)
+            similar_text($newTitleNormalized, $existingNormalized, $percentSimilar);
+            $percentSimilar = $percentSimilar / 100; // Convertir a 0-1
+
+            // Método 2: Levenshtein (distancia de edición)
+            $distance = levenshtein($newTitleNormalized, $existingNormalized);
+            $maxLength = max(strlen($newTitleNormalized), strlen($existingNormalized));
+            $levenshteinSimilarity = 1 - ($distance / $maxLength);
+
+            // Usar el mayor de los dos métodos
+            $similarity = max($percentSimilar, $levenshteinSimilarity);
+
+            if ($similarity > $maxSimilarity) {
+                $maxSimilarity = $similarity;
+                $mostSimilarTitle = $existingTitle;
+            }
+
+            // Si encontramos uno muy similar, no seguir buscando
+            if ($similarity >= $threshold) {
+                return [
+                    'is_similar' => true,
+                    'similar_to' => $existingTitle,
+                    'similarity_percent' => round($similarity * 100, 2)
+                ];
+            }
+        }
+
+        return [
+            'is_similar' => false,
+            'similar_to' => $mostSimilarTitle,
+            'similarity_percent' => round($maxSimilarity * 100, 2)
+        ];
+    }
 
     /**
      * Agregar título a la cola actual
@@ -37,6 +182,8 @@ class TitleQueueManager {
         if (!$campaignId || !$title) {
             return false;
         }
+
+        self::ensureTableExists();
 
         $db = Database::getInstance();
 
@@ -69,6 +216,8 @@ class TitleQueueManager {
         if (!$campaignId) {
             return [];
         }
+
+        self::ensureTableExists();
 
         $db = Database::getInstance();
 
@@ -104,6 +253,8 @@ class TitleQueueManager {
             return false;
         }
 
+        self::ensureTableExists();
+
         $db = Database::getInstance();
 
         try {
@@ -136,6 +287,8 @@ class TitleQueueManager {
             return false;
         }
 
+        self::ensureTableExists();
+
         $db = Database::getInstance();
 
         try {
@@ -165,6 +318,8 @@ class TitleQueueManager {
         if (!$campaignId) {
             return ['count' => 0, 'first_created' => null, 'last_created' => null];
         }
+
+        self::ensureTableExists();
 
         $db = Database::getInstance();
 
@@ -198,6 +353,8 @@ class TitleQueueManager {
      * @return int Número total de títulos almacenados
      */
     public static function getTotalTitlesCount() {
+        self::ensureTableExists();
+
         $db = Database::getInstance();
 
         try {
@@ -218,27 +375,11 @@ class TitleQueueManager {
      * Limpieza manual de títulos antiguos
      *
      * Elimina títulos más antiguos que el número de horas especificado.
-     * Normalmente esto lo hace el event scheduler automáticamente.
      *
      * @param int $hoursOld Antigüedad en horas (default: 24)
-     * @return int Número de títulos eliminados
+     * @return bool True si la limpieza fue exitosa
      */
     public static function cleanupOldTitles($hoursOld = 24) {
-        $db = Database::getInstance();
-
-        try {
-            $db->query("
-                DELETE FROM " . DB_PREFIX . "queue_titles
-                WHERE created_at < DATE_SUB(NOW(), INTERVAL ? HOUR)
-            ", [(int)$hoursOld]);
-
-            // Obtener número de filas afectadas depende de la implementación de Database
-            // Por ahora retornamos true para indicar éxito
-            return true;
-
-        } catch (Exception $e) {
-            error_log("TitleQueueManager: Error cleaning up old titles - " . $e->getMessage());
-            return false;
-        }
+        return self::autoCleanup($hoursOld);
     }
 }
