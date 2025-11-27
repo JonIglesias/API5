@@ -112,7 +112,7 @@ define('TIMEZONE', 'Europe/Madrid');
 define('DATE_FORMAT', 'Y-m-d H:i:s');
 
 // API Version
-define('API_VERSION', '4.15');
+define('API_VERSION', '4.17');
 
 // Directorio base
 define('API_BASE_DIR', __DIR__);

@@ -167,6 +167,54 @@ abstract class BaseEndpoint {
     }
     
     /**
+     * Añade contexto de títulos previos de la cola al prompt
+     *
+     * Este método NO modifica el archivo .md, sino que inyecta
+     * dinámicamente al final del prompt los títulos ya generados
+     * en la campaña actual para evitar repeticiones.
+     *
+     * COMPORTAMIENTO:
+     * - Si NO hay campaign_id → Retorna prompt sin modificar (operación individual)
+     * - Si hay campaign_id pero sin títulos previos → Retorna prompt sin modificar
+     * - Si hay títulos previos → Añade sección al final con lista de títulos a evitar
+     *
+     * @param string $prompt Prompt base (ya procesado desde .md)
+     * @param string|null $campaignId ID de la campaña (opcional)
+     * @param int $limit Máximo de títulos previos a incluir (default: 10)
+     * @return string Prompt con contexto de cola añadido (si aplica)
+     */
+    protected function appendQueueContext($prompt, $campaignId = null, $limit = 10) {
+        // Si no hay campaign_id, es una operación individual - no añadir contexto
+        if (!$campaignId) {
+            return $prompt;
+        }
+
+        require_once API_BASE_DIR . '/services/TitleQueueManager.php';
+
+        // Obtener títulos previos de esta cola
+        $previousTitles = TitleQueueManager::getTitles($campaignId, $limit);
+
+        // Si no hay títulos previos, retornar prompt original
+        if (empty($previousTitles)) {
+            return $prompt;
+        }
+
+        // Construir sección de contexto
+        $contextSection = "\n\n---\n\n";
+        $contextSection .= "🚫 IMPORTANTE - TÍTULOS YA GENERADOS EN ESTA CAMPAÑA:\n";
+        $contextSection .= "NO repitas ni parafrasees estos títulos. Genera uno COMPLETAMENTE DIFERENTE:\n\n";
+
+        foreach ($previousTitles as $index => $title) {
+            $contextSection .= "- " . $title . "\n";
+        }
+
+        $contextSection .= "\n❗ El nuevo título debe ser ÚNICO y DISTINTO a todos los anteriores.\n";
+        $contextSection .= "Usa variaciones en: estructura, enfoque, beneficio destacado, o perspectiva.\n";
+
+        return $prompt . $contextSection;
+    }
+
+    /**
      * Método abstracto que cada endpoint debe implementar
      */
     abstract public function handle();
