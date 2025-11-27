@@ -107,10 +107,10 @@ class GenerarTituloEndpoint extends BaseEndpoint {
                 $promptWithContext .= "El título anterior fue RECHAZADO por similitud del {$lastSimilarityInfo['similarity_percent']}% con:\n";
                 $promptWithContext .= "\"" . $lastSimilarityInfo['similar_to'] . "\"\n\n";
                 $promptWithContext .= "DEBES generar un título RADICALMENTE DIFERENTE:\n";
-                $promptWithContext .= "- Usa VERBOS DISTINTOS (no 'descubre', 'transforma', 'conviértete')\n";
-                $promptWithContext .= "- Cambia COMPLETAMENTE la estructura\n";
-                $promptWithContext .= "- Enfoca desde OTRA PERSPECTIVA\n";
-                $promptWithContext .= "- Usa SINÓNIMOS Y VARIACIONES\n";
+                $promptWithContext .= "- Usa palabras y verbos completamente distintos\n";
+                $promptWithContext .= "- Cambia totalmente la estructura y el orden\n";
+                $promptWithContext .= "- Enfoca desde una perspectiva diferente\n";
+                $promptWithContext .= "- Aplica sinónimos y variaciones\n";
             }
 
             // Parámetros optimizados (aumentar temperatura en reintentos)
