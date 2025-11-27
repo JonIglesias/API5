@@ -1,0 +1,134 @@
+<?php
+$success = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $configPath = __DIR__ . '/../../config.php';
+    $configContent = file_get_contents($configPath);
+    
+    // Reemplazar valores
+    $replacements = [
+        "define('WC_API_URL', '" . WC_API_URL . "');" => 
+            "define('WC_API_URL', '" . addslashes($_POST['wc_api_url']) . "');",
+        
+        "define('WC_CONSUMER_KEY', '" . WC_CONSUMER_KEY . "');" => 
+            "define('WC_CONSUMER_KEY', '" . addslashes($_POST['wc_consumer_key']) . "');",
+        
+        "define('WC_CONSUMER_SECRET', '" . WC_CONSUMER_SECRET . "');" => 
+            "define('WC_CONSUMER_SECRET', '" . addslashes($_POST['wc_consumer_secret']) . "');",
+        
+        "define('SYNC_CRITICAL_INTERVAL', " . SYNC_CRITICAL_INTERVAL . ");" => 
+            "define('SYNC_CRITICAL_INTERVAL', " . (int)$_POST['sync_critical'] . ");",
+        
+        "define('SYNC_REGULAR_INTERVAL', " . SYNC_REGULAR_INTERVAL . ");" => 
+            "define('SYNC_REGULAR_INTERVAL', " . (int)$_POST['sync_regular'] . ");",
+        
+        "define('SYNC_INACTIVE_INTERVAL', " . SYNC_INACTIVE_INTERVAL . ");" => 
+            "define('SYNC_INACTIVE_INTERVAL', " . (int)$_POST['sync_inactive'] . ");"
+    ];
+    
+    foreach ($replacements as $search => $replace) {
+        $configContent = str_replace($search, $replace, $configContent);
+    }
+    
+    if (file_put_contents($configPath, $configContent)) {
+        $success = '✅ Configuración guardada correctamente. Recarga la página para aplicar cambios.';
+    } else {
+        $error = '❌ Error: No se pudo escribir en config.php. Verifica permisos.';
+    }
+}
+?>
+
+<style>
+.settings-card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+.settings-card h3 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+.info-box { background: #e7f3ff; border-left: 4px solid #007bff; padding: 15px; margin-bottom: 20px; }
+.warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+.form-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+.form-group small { color: #6c757d; font-size: 12px; }
+.btn { padding: 10px 20px; border-radius: 4px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; }
+.btn-primary { background: #007bff; color: white; }
+.alert { padding: 12px; border-radius: 4px; margin-bottom: 20px; }
+.alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+table { width: 100%; }
+table td { padding: 8px 0; }
+table td:first-child { font-weight: 600; width: 200px; }
+</style>
+
+<?php if ($success): ?>
+    <div class="alert alert-success"><?= $success ?></div>
+<?php endif; ?>
+
+<?php if ($error): ?>
+    <div class="alert alert-danger"><?= $error ?></div>
+<?php endif; ?>
+
+<form method="POST">
+    <div class="settings-card">
+        <h3>🛒 WooCommerce API</h3>
+        
+        <div class="warning-box">
+            <strong>⚠️ Importante:</strong> Obtén las credenciales en WooCommerce → Settings → Advanced → REST API
+        </div>
+        
+        <div class="form-group">
+            <label>WooCommerce API URL *</label>
+            <input type="url" name="wc_api_url" value="<?= htmlspecialchars(WC_API_URL) ?>" required>
+            <small>Ejemplo: https://tu-tienda.com/wp-json/wc/v3/</small>
+        </div>
+        
+        <div class="form-group">
+            <label>Consumer Key *</label>
+            <input type="text" name="wc_consumer_key" value="<?= htmlspecialchars(WC_CONSUMER_KEY) ?>" required>
+            <small>Comienza con ck_</small>
+        </div>
+        
+        <div class="form-group">
+            <label>Consumer Secret *</label>
+            <input type="text" name="wc_consumer_secret" value="<?= htmlspecialchars(WC_CONSUMER_SECRET) ?>" required>
+            <small>Comienza con cs_</small>
+        </div>
+    </div>
+    
+    <div class="settings-card">
+        <h3>🔄 Intervalos de Sincronización</h3>
+        
+        <div class="info-box">
+            Los intervalos determinan con qué frecuencia se sincronizan las licencias con WooCommerce
+        </div>
+        
+        <div class="form-group">
+            <label>Licencias Críticas (segundos) *</label>
+            <input type="number" name="sync_critical" value="<?= SYNC_CRITICAL_INTERVAL ?>" required>
+            <small>Actual: <?= SYNC_CRITICAL_INTERVAL ?> seg (<?= SYNC_CRITICAL_INTERVAL / 60 ?> min) - Para licencias próximas a expirar</small>
+        </div>
+        
+        <div class="form-group">
+            <label>Licencias Normales (segundos) *</label>
+            <input type="number" name="sync_regular" value="<?= SYNC_REGULAR_INTERVAL ?>" required>
+            <small>Actual: <?= SYNC_REGULAR_INTERVAL ?> seg (<?= SYNC_REGULAR_INTERVAL / 3600 ?> h) - Para licencias activas</small>
+        </div>
+        
+        <div class="form-group">
+            <label>Licencias Inactivas (segundos) *</label>
+            <input type="number" name="sync_inactive" value="<?= SYNC_INACTIVE_INTERVAL ?>" required>
+            <small>Actual: <?= SYNC_INACTIVE_INTERVAL ?> seg (<?= SYNC_INACTIVE_INTERVAL / 3600 ?> h) - Para licencias expiradas/canceladas</small>
+        </div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">💾 Guardar Configuración</button>
+</form>
+
+<div class="settings-card" style="margin-top: 20px;">
+    <h3>ℹ️ Información del Sistema</h3>
+    <table>
+        <tr><td>Versión API:</td><td><?= API_VERSION ?></td></tr>
+        <tr><td>PHP:</td><td><?= PHP_VERSION ?></td></tr>
+        <tr><td>Base de Datos:</td><td><?= DB_NAME ?></td></tr>
+        <tr><td>Timezone:</td><td><?= date_default_timezone_get() ?></td></tr>
+        <tr><td>Fecha/Hora Servidor:</td><td><?= date('Y-m-d H:i:s') ?></td></tr>
+    </table>
+</div>

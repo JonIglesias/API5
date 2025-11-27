@@ -1,0 +1,260 @@
+/**
+ * AutoPost Modern UI - Global Styles
+ * Inspirado en iOS/macOS design
+ */
+
+/* Variables */
+:root {
+    --ap-primary: #4A90E2;
+    --ap-primary-dark: #357ABD;
+    --ap-secondary: #5FC3E4;
+    --ap-success: #52C41A;
+    --ap-danger: #FF4D4F;
+    --ap-warning: #FAAD14;
+    --ap-bg: #F5F7FA;
+    --ap-card: #FFFFFF;
+    --ap-border: #E8ECEF;
+    --ap-text: #2C3E50;
+    --ap-text-light: #6B7A8F;
+    --ap-shadow: 0 2px 8px rgba(74, 144, 226, 0.12);
+    --ap-shadow-lg: 0 8px 24px rgba(74, 144, 226, 0.16);
+    --ap-radius: 12px;
+    --ap-radius-lg: 16px;
+}
+
+/* Contenedores principales */
+.wrap {
+    background: var(--ap-bg);
+    padding: 24px;
+    margin: -20px -20px 0 -10px;
+}
+
+.wrap h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ap-text);
+    margin-bottom: 24px;
+}
+
+/* Cards modernas */
+.ap-card {
+    background: var(--ap-card);
+    border-radius: var(--ap-radius-lg);
+    padding: 24px;
+    box-shadow: var(--ap-shadow);
+    margin-bottom: 20px;
+    border: 1px solid var(--ap-border);
+}
+
+.ap-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--ap-border);
+}
+
+.ap-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ap-text);
+    margin: 0;
+}
+
+/* Botones modernos */
+.ap-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ap-btn-primary {
+    background: linear-gradient(135deg, var(--ap-primary) 0%, var(--ap-secondary) 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.ap-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
+}
+
+.ap-btn-secondary {
+    background: var(--ap-card);
+    color: var(--ap-text);
+    border: 1px solid var(--ap-border);
+}
+
+.ap-btn-secondary:hover {
+    background: var(--ap-bg);
+    border-color: var(--ap-primary);
+}
+
+.ap-btn-success {
+    background: var(--ap-success);
+    color: white;
+}
+
+.ap-btn-danger {
+    background: var(--ap-danger);
+    color: white;
+}
+
+/* Tablas modernas */
+.ap-table-wrapper {
+    background: var(--ap-card);
+    border-radius: var(--ap-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--ap-shadow);
+}
+
+.ap-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ap-table thead {
+    background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+}
+
+.ap-table th {
+    padding: 16px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ap-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ap-table td {
+    padding: 16px;
+    border-top: 1px solid var(--ap-border);
+    color: var(--ap-text);
+}
+
+.ap-table tbody tr {
+    transition: background 0.15s;
+}
+
+.ap-table tbody tr:hover {
+    background: #F8FAFC;
+}
+
+/* Badges/Estado */
+.ap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ap-badge-success {
+    background: #F0F9FF;
+    color: #0284C7;
+}
+
+.ap-badge-warning {
+    background: #FFF7ED;
+    color: #EA580C;
+}
+
+.ap-badge-danger {
+    background: #FEF2F2;
+    color: #DC2626;
+}
+
+/* Inputs modernos */
+.ap-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--ap-border);
+    border-radius: 10px;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.ap-input:focus {
+    outline: none;
+    border-color: var(--ap-primary);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+/* Progress bar moderna */
+.ap-progress {
+    background: #E8ECEF;
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.ap-progress-bar {
+    background: linear-gradient(90deg, var(--ap-primary), var(--ap-secondary));
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s;
+}
+
+/* Drag handle moderno */
+.drag-handle {
+    cursor: grab;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.15s;
+}
+
+.drag-handle:hover {
+    background: var(--ap-bg);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Tooltips */
+.ap-tooltip {
+    position: relative;
+}
+
+.ap-tooltip:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    background: #1F2937;
+    color: white;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    margin-bottom: 8px;
+    z-index: 1000;
+}
+
+/* Animaciones */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ap-animate {
+    animation: slideIn 0.3s ease;
+}

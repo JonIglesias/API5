@@ -1,0 +1,320 @@
+<?php
+// Procesar acciones
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
+    
+    if ($action === 'create') {
+        // Generar license key
+        $prefix = strtoupper($_POST['plan_id']);
+        $random = strtoupper(substr(md5(uniqid()), 0, 12));
+        $licenseKey = $prefix . '-' . date('Y') . '-' . $random;
+        
+        $data = [
+            'license_key' => $licenseKey,
+            'plan_id' => $_POST['plan_id'],
+            'status' => 'active',
+            'tokens_limit' => (int)$_POST['tokens_limit'],
+            'tokens_used_this_period' => 0,
+            'period_starts_at' => date('Y-m-d H:i:s'),
+            'period_ends_at' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'created_at' => date('Y-m-d H:i:s'),
+            'last_synced_at' => date('Y-m-d H:i:s'),
+            'sync_status' => 'fresh'
+        ];
+        
+        if (!empty($_POST['woo_subscription_id'])) {
+            $data['woo_subscription_id'] = (int)$_POST['woo_subscription_id'];
+        }
+        
+        if (!empty($_POST['woo_user_id'])) {
+            $data['woo_user_id'] = (int)$_POST['woo_user_id'];
+        }
+        
+        $db->insert('licenses', $data);
+        header('Location: ?module=licenses');
+        exit;
+    }
+    
+    if ($action === 'suspend' || $action === 'activate') {
+        $newStatus = $action === 'suspend' ? 'suspended' : 'active';
+        $db->update('licenses', ['status' => $newStatus], 'id = ?', [$_POST['license_id']]);
+        header('Location: ?module=licenses');
+        exit;
+    }
+    
+    if ($action === 'delete') {
+        $db->delete('licenses', 'id = ?', [$_POST['license_id']]);
+        header('Location: ?module=licenses');
+        exit;
+    }
+}
+
+// Obtener licencias
+$licenses = $db->query("
+    SELECT 
+        l.*,
+        p.name as plan_name,
+        p.tokens_per_month as plan_tokens
+    FROM " . DB_PREFIX . "licenses l
+    LEFT JOIN " . DB_PREFIX . "plans p ON l.plan_id = p.id
+    ORDER BY l.created_at DESC
+");
+
+// Obtener planes para el formulario
+$plans = $db->query("SELECT * FROM " . DB_PREFIX . "plans WHERE is_active = 1");
+
+$creating = isset($_GET['create']);
+$viewing = isset($_GET['view']) ? $_GET['view'] : null;
+$viewLicense = null;
+
+if ($viewing) {
+    $viewLicense = $db->fetchOne("
+        SELECT l.*, p.name as plan_name
+        FROM " . DB_PREFIX . "licenses l
+        LEFT JOIN " . DB_PREFIX . "plans p ON l.plan_id = p.id
+        WHERE l.id = ?
+    ", [$viewing]);
+    
+    // Obtener uso reciente
+    $recentUsage = $db->query("
+        SELECT *
+        FROM " . DB_PREFIX . "usage_tracking
+        WHERE license_id = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+    ", [$viewing]);
+}
+?>
+
+<style>
+.table-container { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+table { width: 100%; border-collapse: collapse; }
+th { background: #f8f9fa; padding: 12px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; }
+td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+tr:hover { background: #f8f9fa; }
+.badge { padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge-active { background: #d4edda; color: #155724; }
+.badge-suspended { background: #fff3cd; color: #856404; }
+.badge-expired { background: #f8d7da; color: #721c24; }
+.badge-cancelled { background: #e2e3e5; color: #383d41; }
+.btn { padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 13px; text-decoration: none; display: inline-block; }
+.btn-primary { background: #007bff; color: white; }
+.btn-success { background: #28a745; color: white; }
+.btn-danger { background: #dc3545; color: white; }
+.actions { display: flex; gap: 5px; }
+.empty-state { padding: 60px 20px; text-align: center; color: #6c757d; }
+.header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.form-card { background: white; padding: 30px; border-radius: 8px; margin-bottom: 20px; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+.form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+.detail-card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+.detail-row { display: flex; padding: 10px 0; border-bottom: 1px solid #eee; }
+.detail-row .label { font-weight: 600; width: 200px; }
+.detail-row .value { flex: 1; }
+</style>
+
+<div class="header-actions">
+    <h2>
+        <?php if ($viewing): ?>
+            Detalle de Licencia
+        <?php elseif ($creating): ?>
+            Nueva Licencia
+        <?php else: ?>
+            Gestión de Licencias
+        <?php endif; ?>
+    </h2>
+    <?php if (!$creating && !$viewing): ?>
+        <a href="?module=licenses&create=1" class="btn btn-primary">+ Nueva Licencia</a>
+    <?php else: ?>
+        <a href="?module=licenses" class="btn">← Volver al listado</a>
+    <?php endif; ?>
+</div>
+
+<?php if ($creating): ?>
+    <div class="form-card">
+        <h3>Crear Nueva Licencia</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="create">
+            
+            <div class="form-group">
+                <label>Plan *</label>
+                <select name="plan_id" required onchange="updateTokens(this)">
+                    <option value="">Seleccionar plan...</option>
+                    <?php foreach ($plans as $plan): ?>
+                        <option value="<?= $plan['id'] ?>" data-tokens="<?= $plan['tokens_per_month'] ?>">
+                            <?= htmlspecialchars($plan['name']) ?> (<?= number_format($plan['tokens_per_month']) ?> tokens)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Límite de Tokens *</label>
+                <input type="number" name="tokens_limit" id="tokens_limit" required>
+                <small>Se autocompletará según el plan seleccionado</small>
+            </div>
+            
+            <div class="form-group">
+                <label>WooCommerce Subscription ID</label>
+                <input type="number" name="woo_subscription_id">
+                <small>Opcional - ID de la suscripción en WooCommerce</small>
+            </div>
+            
+            <div class="form-group">
+                <label>WooCommerce User ID</label>
+                <input type="number" name="woo_user_id">
+                <small>Opcional - ID del usuario en WooCommerce</small>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary">Crear Licencia</button>
+                <a href="?module=licenses" class="btn">Cancelar</a>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+    function updateTokens(select) {
+        const option = select.options[select.selectedIndex];
+        const tokens = option.getAttribute('data-tokens');
+        if (tokens) {
+            document.getElementById('tokens_limit').value = tokens;
+        }
+    }
+    </script>
+
+<?php elseif ($viewing && $viewLicense): ?>
+    <div class="detail-card">
+        <h3>Información de la Licencia</h3>
+        <div class="detail-row">
+            <div class="label">License Key:</div>
+            <div class="value"><code><?= htmlspecialchars($viewLicense['license_key']) ?></code></div>
+        </div>
+        <div class="detail-row">
+            <div class="label">Plan:</div>
+            <div class="value"><?= htmlspecialchars($viewLicense['plan_name']) ?></div>
+        </div>
+        <div class="detail-row">
+            <div class="label">Estado:</div>
+            <div class="value">
+                <span class="badge badge-<?= $viewLicense['status'] ?>">
+                    <?= ucfirst($viewLicense['status']) ?>
+                </span>
+            </div>
+        </div>
+        <div class="detail-row">
+            <div class="label">Tokens Usados:</div>
+            <div class="value">
+                <?= number_format($viewLicense['tokens_used_this_period']) ?> / 
+                <?= number_format($viewLicense['tokens_limit']) ?>
+                (<?= round(($viewLicense['tokens_used_this_period'] / $viewLicense['tokens_limit']) * 100, 1) ?>%)
+            </div>
+        </div>
+        <div class="detail-row">
+            <div class="label">Periodo:</div>
+            <div class="value">
+                <?= date('d/m/Y', strtotime($viewLicense['period_starts_at'])) ?> - 
+                <?= date('d/m/Y', strtotime($viewLicense['period_ends_at'])) ?>
+            </div>
+        </div>
+        <div class="detail-row">
+            <div class="label">Creada:</div>
+            <div class="value"><?= date('d/m/Y H:i', strtotime($viewLicense['created_at'])) ?></div>
+        </div>
+        <?php if ($viewLicense['woo_subscription_id']): ?>
+        <div class="detail-row">
+            <div class="label">WooCommerce Subscription:</div>
+            <div class="value"><?= $viewLicense['woo_subscription_id'] ?></div>
+        </div>
+        <?php endif; ?>
+    </div>
+    
+    <div class="detail-card">
+        <h3>Uso Reciente</h3>
+        <?php if (empty($recentUsage)): ?>
+            <p style="color: #6c757d; text-align: center; padding: 20px;">No hay registro de uso aún</p>
+        <?php else: ?>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Operación</th>
+                        <th>Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($recentUsage as $usage): ?>
+                        <tr>
+                            <td><?= date('d/m/Y H:i', strtotime($usage['created_at'])) ?></td>
+                            <td><?= htmlspecialchars($usage['operation_type']) ?></td>
+                            <td><?= number_format($usage['tokens_total']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+
+<?php else: ?>
+    <?php if (empty($licenses)): ?>
+        <div class="table-container">
+            <div class="empty-state">
+                <h3>No hay licencias</h3>
+                <p>Crea tu primera licencia para comenzar</p>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>License Key</th>
+                        <th>Plan</th>
+                        <th>Status</th>
+                        <th>Tokens Usados</th>
+                        <th>Expira</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($licenses as $license): ?>
+                        <tr>
+                            <td><code><?= htmlspecialchars($license['license_key']) ?></code></td>
+                            <td><?= htmlspecialchars($license['plan_name'] ?? 'N/A') ?></td>
+                            <td>
+                                <span class="badge badge-<?= $license['status'] ?>">
+                                    <?= ucfirst($license['status']) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <?= number_format($license['tokens_used_this_period']) ?> / 
+                                <?= number_format($license['tokens_limit']) ?>
+                            </td>
+                            <td><?= date('d/m/Y', strtotime($license['period_ends_at'])) ?></td>
+                            <td>
+                                <div class="actions">
+                                    <a href="?module=licenses&view=<?= $license['id'] ?>" class="btn btn-primary">Ver</a>
+                                    
+                                    <form method="POST" style="display: inline;">
+                                        <input type="hidden" name="action" value="<?= $license['status'] === 'active' ? 'suspend' : 'activate' ?>">
+                                        <input type="hidden" name="license_id" value="<?= $license['id'] ?>">
+                                        <button type="submit" class="btn <?= $license['status'] === 'active' ? 'btn-danger' : 'btn-success' ?>">
+                                            <?= $license['status'] === 'active' ? 'Suspender' : 'Activar' ?>
+                                        </button>
+                                    </form>
+                                    
+                                    <form method="POST" style="display: inline;" onsubmit="return confirm('¿ELIMINAR esta licencia?')">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="license_id" value="<?= $license['id'] ?>">
+                                        <button type="submit" class="btn btn-danger">Eliminar</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+<?php endif; ?>

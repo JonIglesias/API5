@@ -1,0 +1,343 @@
+/* ===================================
+   AUTOPOST V2 - MODERN UI STYLES
+   Solo CSS - Sin tocar HTML ni JS
+   =================================== */
+
+/* Variables */
+:root {
+    --ap-primary: #4A9EFF;
+    --ap-primary-hover: #3B8EEF;
+    --ap-danger: #EF4444;
+    --ap-danger-hover: #DC2626;
+    --ap-success: #10B981;
+    --ap-warning: #F59E0B;
+    --ap-dark: #3D4A5C;
+    --ap-gray-50: #F9FAFB;
+    --ap-gray-100: #F3F4F6;
+    --ap-gray-200: #E5E7EB;
+    --ap-gray-300: #D1D5DB;
+    --ap-gray-400: #9CA3AF;
+    --ap-gray-500: #6B7280;
+    --ap-gray-600: #4B5563;
+    --ap-gray-700: #374151;
+    --ap-gray-800: #1F2937;
+    --ap-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --ap-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --ap-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* ==================
+   TABLAS MODERNAS
+   ================== */
+
+.wp-list-table {
+    background: white;
+    border-radius: 12px !important;
+    box-shadow: var(--ap-shadow) !important;
+    border: none !important;
+    overflow: hidden;
+}
+
+.wp-list-table thead {
+    background: var(--ap-gray-50) !important;
+}
+
+.wp-list-table thead th,
+.wp-list-table thead td {
+    padding: 12px 16px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: var(--ap-gray-600) !important;
+    border-bottom: 1px solid var(--ap-gray-200) !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: transparent !important;
+}
+
+.wp-list-table tbody tr {
+    border-bottom: 1px solid var(--ap-gray-100) !important;
+    transition: background 0.15s ease;
+    border-left: none !important;
+    border-right: none !important;
+}
+
+.wp-list-table tbody tr:hover {
+    background: var(--ap-gray-50) !important;
+}
+
+.wp-list-table tbody td,
+.wp-list-table tbody th {
+    padding: 16px !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+}
+
+.wp-list-table.striped > tbody > tr:nth-child(odd) {
+    background: transparent !important;
+}
+
+.wp-list-table input[type="checkbox"] {
+    border-radius: 4px !important;
+    border: 2px solid var(--ap-gray-300) !important;
+}
+
+/* ==================
+   BOTONES MODERNOS  
+   ================== */
+
+.button-primary,
+.wp-core-ui .button-primary {
+    background: var(--ap-primary) !important;
+    border-color: var(--ap-primary) !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+.button-primary:hover,
+.wp-core-ui .button-primary:hover,
+.button-primary:focus,
+.wp-core-ui .button-primary:focus {
+    background: var(--ap-primary-hover) !important;
+    border-color: var(--ap-primary-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: var(--ap-shadow-md) !important;
+}
+
+.button-primary:active {
+    transform: translateY(0) !important;
+}
+
+.button,
+.wp-core-ui .button {
+    border-radius: 8px !important;
+    border-color: var(--ap-gray-300) !important;
+    background: white !important;
+    color: var(--ap-gray-700) !important;
+    transition: all 0.15s ease !important;
+    box-shadow: var(--ap-shadow-sm) !important;
+}
+
+.button:hover,
+.wp-core-ui .button:hover,
+.button:focus,
+.wp-core-ui .button:focus {
+    background: var(--ap-gray-50) !important;
+    border-color: var(--ap-gray-400) !important;
+    color: var(--ap-gray-800) !important;
+}
+
+.button-hero {
+    padding: 12px 24px !important;
+    font-size: 16px !important;
+}
+
+.page-title-action {
+    background: var(--ap-primary) !important;
+    border-color: var(--ap-primary) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 6px 16px !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease !important;
+}
+
+.page-title-action:hover {
+    background: var(--ap-primary-hover) !important;
+    border-color: var(--ap-primary-hover) !important;
+    color: white !important;
+    transform: translateY(-1px);
+}
+
+.delete-campaign {
+    color: var(--ap-danger) !important;
+    border-color: var(--ap-gray-300) !important;
+}
+
+.delete-campaign:hover {
+    background: var(--ap-danger) !important;
+    border-color: var(--ap-danger) !important;
+    color: white !important;
+}
+
+.button-link-delete {
+    color: var(--ap-danger) !important;
+}
+
+.button-link-delete:hover {
+    color: var(--ap-danger-hover) !important;
+}
+
+/* ==================
+   HEADERS Y TÍTULOS
+   ================== */
+
+.wrap > h1,
+.wrap h1.wp-heading-inline {
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    color: var(--ap-gray-800) !important;
+    margin-bottom: 20px !important;
+}
+
+.wrap > h2 {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: var(--ap-gray-800) !important;
+}
+
+/* ==================
+   NOTICES/ALERTAS
+   ================== */
+
+.notice {
+    border-left-width: 4px !important;
+    border-radius: 8px !important;
+    box-shadow: var(--ap-shadow-sm) !important;
+}
+
+.notice-info {
+    border-left-color: var(--ap-primary) !important;
+    background: #DBEAFE !important;
+}
+
+.notice-success {
+    border-left-color: var(--ap-success) !important;
+    background: #D1FAE5 !important;
+}
+
+.notice-warning {
+    border-left-color: var(--ap-warning) !important;
+    background: #FEF3C7 !important;
+}
+
+.notice-error {
+    border-left-color: var(--ap-danger) !important;
+    background: #FEE2E2 !important;
+}
+
+/* ==================
+   FORMS
+   ================== */
+
+.form-table th {
+    color: var(--ap-gray-700) !important;
+    font-weight: 500 !important;
+}
+
+.form-table input[type="text"],
+.form-table input[type="url"],
+.form-table input[type="email"],
+.form-table input[type="number"],
+.form-table input[type="password"],
+.form-table textarea,
+.form-table select {
+    border-radius: 8px !important;
+    border-color: var(--ap-gray-300) !important;
+    transition: all 0.15s ease !important;
+}
+
+.form-table input[type="text"]:focus,
+.form-table input[type="url"]:focus,
+.form-table input[type="email"]:focus,
+.form-table input[type="number"]:focus,
+.form-table input[type="password"]:focus,
+.form-table textarea:focus,
+.form-table select:focus {
+    border-color: var(--ap-primary) !important;
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1) !important;
+    outline: none !important;
+}
+
+/* ==================
+   TABLENAV
+   ================== */
+
+.tablenav {
+    margin: 10px 0 20px !important;
+}
+
+.tablenav .button {
+    margin-right: 8px !important;
+}
+
+/* ==================
+   BADGES/ESTADOS (con selectores de atributo)
+   ================== */
+
+/* Estado "generando" */
+.queue-status-cell span[style*="orange"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 4px 12px !important;
+    background: #FEF3C7 !important;
+    color: #92400E !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+/* Estado "sí" (verde) */
+.queue-status-cell span[style*="green"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 4px 12px !important;
+    background: #D1FAE5 !important;
+    color: #065F46 !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+/* Estado "no" (rojo) */
+.queue-status-cell span[style*="red"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 4px 12px !important;
+    background: #FEE2E2 !important;
+    color: #991B1B !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+/* ==================
+   PROGRESS BARS
+   ================== */
+
+.mini-progress-bar {
+    background: var(--ap-primary) !important;
+    border-radius: 4px !important;
+}
+
+#progress-bar {
+    background: linear-gradient(90deg, var(--ap-primary), #3b82f6) !important;
+}
+
+#global-progress-bar {
+    background: linear-gradient(90deg, var(--ap-primary), #3b82f6) !important;
+}
+
+/* ==================
+   RESPONSIVE
+   ================== */
+
+@media screen and (max-width: 782px) {
+    .wp-list-table tbody td,
+    .wp-list-table tbody th {
+        padding: 12px !important;
+    }
+    
+    .button,
+    .button-primary {
+        padding: 8px 14px !important;
+    }
+}

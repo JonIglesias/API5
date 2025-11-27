@@ -1,0 +1,282 @@
+<?php
+// Separar completamente las peticiones AJAX del HTML
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
+    header('Content-Type: application/json');
+    $action = $_POST['ajax_action'];
+    
+    try {
+        if ($action === 'sync_all') {
+            $licenses = $db->query("SELECT id, license_key FROM " . DB_PREFIX . "licenses WHERE status = 'active'");
+            
+            $synced = 0;
+            foreach ($licenses as $license) {
+                $db->insert('sync_logs', [
+                    'license_id' => $license['id'],
+                    'sync_type' => 'manual',
+                    'status' => 'success',
+                    'changes_detected' => 'Manual sync triggered from admin panel',
+                    'created_at' => date('Y-m-d H:i:s')
+                ]);
+                
+                $db->update('licenses', 
+                    ['last_synced_at' => date('Y-m-d H:i:s'), 'sync_status' => 'fresh'],
+                    'id = ?',
+                    [$license['id']]
+                );
+                $synced++;
+            }
+            
+            echo json_encode(['success' => true, 'message' => "Sincronizadas $synced licencias", 'count' => $synced]);
+            exit;
+        }
+        
+        if ($action === 'test_connection') {
+            $apiUrl = WC_API_URL;
+            $consumerKey = WC_CONSUMER_KEY;
+            $consumerSecret = WC_CONSUMER_SECRET;
+            
+            // Validar que estén configuradas
+            if (empty($apiUrl) || strpos($consumerKey, 'XXX') !== false || strpos($consumerKey, 'ck_') === false) {
+                echo json_encode([
+                    'success' => false, 
+                    'error' => 'Credenciales no configuradas. Ve a Settings y configura WooCommerce API.'
+                ]);
+                exit;
+            }
+            
+            // Test real de conexión
+            $testUrl = rtrim($apiUrl, '/') . '?consumer_key=' . urlencode($consumerKey) . 
+                       '&consumer_secret=' . urlencode($consumerSecret);
+            
+            $ch = curl_init($testUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_FOLLOWLOCATION => true
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            // Analizar respuesta
+            if ($curlError) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Error de conexión: ' . $curlError
+                ]);
+                exit;
+            }
+            
+            if ($httpCode === 200) {
+                $json = json_decode($response, true);
+                if (is_array($json)) {
+                    echo json_encode([
+                        'success' => true,
+                        'message' => '✅ Conexión exitosa con WooCommerce API'
+                    ]);
+                } else {
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Respuesta inválida del servidor'
+                    ]);
+                }
+            } elseif ($httpCode === 401) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Credenciales inválidas. Verifica Consumer Key y Secret en Settings.'
+                ]);
+            } elseif ($httpCode === 404) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'URL incorrecta. Verifica WC_API_URL en Settings (debe terminar en /wc/v3/)'
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'error' => "Error HTTP $httpCode. Verifica la URL y que WooCommerce esté activo."
+                ]);
+            }
+            exit;
+        }
+        
+        echo json_encode(['success' => false, 'error' => 'Acción no válida']);
+        exit;
+        
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        exit;
+    }
+}
+
+// Si llegamos aquí, renderizar HTML normal
+$syncLogs = $db->query("
+    SELECT sl.*, l.license_key
+    FROM " . DB_PREFIX . "sync_logs sl
+    LEFT JOIN " . DB_PREFIX . "licenses l ON sl.license_id = l.id
+    ORDER BY sl.created_at DESC
+    LIMIT 50
+");
+
+$result = $db->query("SELECT COUNT(*) as total FROM " . DB_PREFIX . "sync_logs WHERE DATE(created_at) = CURDATE()");
+$today = $result[0]['total'] ?? 0;
+
+$result = $db->query("SELECT COUNT(*) as total FROM " . DB_PREFIX . "sync_logs WHERE status = 'success' AND DATE(created_at) = CURDATE()");
+$success = $result[0]['total'] ?? 0;
+
+$result = $db->query("SELECT COUNT(*) as total FROM " . DB_PREFIX . "sync_logs WHERE status = 'failed' AND DATE(created_at) = CURDATE()");
+$failed = $result[0]['total'] ?? 0;
+?>
+<style>
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+.stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.stat-card .label { font-size: 14px; color: #6c757d; }
+.stat-card .value { font-size: 32px; font-weight: 700; margin-top: 10px; }
+.actions { margin-bottom: 20px; display: flex; gap: 10px; }
+.btn { padding: 10px 20px; border-radius: 4px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; }
+.btn-primary { background: #007bff; color: white; }
+.btn-success { background: #28a745; color: white; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.logs-table { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+table { width: 100%; border-collapse: collapse; }
+th { background: #f8f9fa; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+.badge { padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge-success { background: #d4edda; color: #155724; }
+.badge-failed { background: #f8d7da; color: #721c24; }
+.info-box { background: #e7f3ff; border-left: 4px solid #007bff; padding: 15px; margin-bottom: 20px; }
+</style>
+
+<div class="info-box">
+    <strong>💡 Información:</strong> La sincronización permite mantener actualizadas las licencias con WooCommerce. 
+    El "Test WooCommerce" verifica que las credenciales API sean correctas.
+</div>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="label">Syncs Hoy</div>
+        <div class="value"><?= $today ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Exitosos</div>
+        <div class="value" style="color: #28a745;"><?= $success ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Fallidos</div>
+        <div class="value" style="color: #dc3545;"><?= $failed ?></div>
+    </div>
+</div>
+
+<div class="actions">
+    <button onclick="forceSyncAll()" class="btn btn-primary" id="syncBtn">🔄 Sincronizar Todas</button>
+    <button onclick="testConnection()" class="btn btn-success" id="testBtn">🔍 Test WooCommerce</button>
+</div>
+
+<div class="logs-table">
+    <h3 style="padding: 20px; margin: 0; border-bottom: 1px solid #dee2e6;">Últimas Sincronizaciones</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Licencia</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Cambios</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($syncLogs)): ?>
+                <tr><td colspan="5" style="text-align: center; padding: 40px; color: #6c757d;">
+                    No hay logs de sincronización aún
+                </td></tr>
+            <?php else: ?>
+                <?php foreach ($syncLogs as $log): ?>
+                    <tr>
+                        <td><?= date('d/m/Y H:i', strtotime($log['created_at'])) ?></td>
+                        <td><code><?= htmlspecialchars($log['license_key'] ?? 'N/A') ?></code></td>
+                        <td><?= htmlspecialchars($log['sync_type']) ?></td>
+                        <td><span class="badge badge-<?= $log['status'] ?>"><?= ucfirst($log['status']) ?></span></td>
+                        <td><?= !empty($log['changes_detected']) ? htmlspecialchars($log['changes_detected']) : '-' ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+</div>
+
+<script>
+async function forceSyncAll() {
+    if (!confirm('¿Sincronizar todas las licencias activas con WooCommerce?')) return;
+    
+    const btn = document.getElementById('syncBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Sincronizando...';
+    
+    try {
+        const formData = new FormData();
+        formData.append('ajax_action', 'sync_all');
+        
+        const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error en la respuesta del servidor');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ ' + result.message);
+            location.reload();
+        } else {
+            alert('❌ Error: ' + result.error);
+        }
+    } catch(e) {
+        alert('❌ Error: ' + e.message);
+        console.error('Sync error:', e);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function testConnection() {
+    const btn = document.getElementById('testBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Probando conexión...';
+    
+    try {
+        const formData = new FormData();
+        formData.append('ajax_action', 'test_connection');
+        
+        const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error en la respuesta del servidor');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+        } else {
+            alert('❌ ' + result.error);
+        }
+    } catch(e) {
+        alert('❌ Error: ' + e.message);
+        console.error('Test error:', e);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+</script>
