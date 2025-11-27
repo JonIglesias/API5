@@ -136,6 +136,26 @@ class TitleQueueManager {
         foreach ($existingTitles as $existingTitle) {
             $existingNormalized = strtolower(trim($existingTitle));
 
+            // [NUEVO v4.21] Método 0: Detección de prefijo común (primeras 30 chars)
+            // Si los primeros 30 caracteres son >80% similares, rechazar
+            $prefixLength = min(30, min(strlen($newTitleNormalized), strlen($existingNormalized)));
+            if ($prefixLength > 15) { // Solo si hay suficiente texto
+                $newPrefix = substr($newTitleNormalized, 0, $prefixLength);
+                $existingPrefix = substr($existingNormalized, 0, $prefixLength);
+
+                similar_text($newPrefix, $existingPrefix, $prefixSimilarity);
+
+                if ($prefixSimilarity > 80) {
+                    // Prefijo muy similar - rechazar inmediatamente
+                    return [
+                        'is_similar' => true,
+                        'similar_to' => $existingTitle,
+                        'similarity_percent' => round($prefixSimilarity, 2),
+                        'reason' => 'common_prefix'
+                    ];
+                }
+            }
+
             // Método 1: similar_text (porcentaje de similitud)
             similar_text($newTitleNormalized, $existingNormalized, $percentSimilar);
             $percentSimilar = $percentSimilar / 100; // Convertir a 0-1
@@ -158,7 +178,8 @@ class TitleQueueManager {
                 return [
                     'is_similar' => true,
                     'similar_to' => $existingTitle,
-                    'similarity_percent' => round($similarity * 100, 2)
+                    'similarity_percent' => round($similarity * 100, 2),
+                    'reason' => 'overall_similarity'
                 ];
             }
         }
