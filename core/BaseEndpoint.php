@@ -199,12 +199,14 @@ abstract class BaseEndpoint {
             return $prompt;
         }
 
-        // Construir sección de contexto (minimalista)
-        $contextSection = "\n\n---\n\nPreviously generated titles:\n";
+        // Construir sección de contexto (minimalista + instrucción clara)
+        $contextSection = "\n\n---\n\nPreviously generated titles (do NOT repeat these):\n";
 
         foreach ($previousTitles as $index => $title) {
             $contextSection .= "- " . $title . "\n";
         }
+
+        $contextSection .= "\nGenerate ONE new title that is different from the above.\n";
 
         return $prompt . $contextSection;
     }
