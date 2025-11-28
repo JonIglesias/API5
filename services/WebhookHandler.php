@@ -458,6 +458,11 @@ class WebhookHandler {
                 ]);
 
                 // Actualizar pedido en WooCommerce con la license_key
+                Logger::webhook('info', 'Attempting to update WooCommerce order with license key', [
+                    'order_id' => $orderId,
+                    'license_key' => $licenseKey
+                ]);
+
                 try {
                     $this->wc->updateOrderMeta($orderId, '_license_key', $licenseKey);
 
