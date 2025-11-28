@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce y en los emails
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -11,7 +11,7 @@
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * WC requires at least: 5.0
- * WC tested up to: 8.0
+ * WC tested up to: 9.0
  *
  * @package WC_License_Display
  */
@@ -20,6 +20,16 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+/**
+ * Declarar compatibilidad con características de WooCommerce
+ */
+add_action('before_woocommerce_init', function() {
+    if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('orders_cache', __FILE__, true);
+    }
+});
 
 /**
  * Mostrar la license key en la página de detalle del pedido (Mi cuenta)
@@ -189,18 +199,41 @@ function wc_license_display_add_admin_column($columns) {
     return $new_columns;
 }
 add_filter('manage_edit-shop_order_columns', 'wc_license_display_add_admin_column', 20);
+add_filter('manage_woocommerce_page_wc-orders_columns', 'wc_license_display_add_admin_column', 20);
 
 
 /**
- * Mostrar el contenido de la columna License Key
+ * Mostrar el contenido de la columna License Key (para pedidos tradicionales)
  *
  * @param string $column Nombre de la columna
  */
 function wc_license_display_admin_column_content($column) {
     global $post;
 
-    if ($column === 'license_key') {
+    if ($column === 'license_key' && isset($post->ID)) {
         $order = wc_get_order($post->ID);
+        if ($order) {
+            $license_key = $order->get_meta('_license_key');
+
+            if (!empty($license_key)) {
+                echo '<code style="font-size: 11px; background: #f0f0f0; padding: 3px 6px; border-radius: 3px;">' . esc_html($license_key) . '</code>';
+            } else {
+                echo '<span style="color: #999;">—</span>';
+            }
+        }
+    }
+}
+add_action('manage_shop_order_posts_custom_column', 'wc_license_display_admin_column_content', 10, 1);
+
+
+/**
+ * Mostrar el contenido de la columna License Key (para HPOS)
+ *
+ * @param string $column Nombre de la columna
+ * @param WC_Order $order Objeto del pedido
+ */
+function wc_license_display_admin_column_content_hpos($column, $order) {
+    if ($column === 'license_key') {
         $license_key = $order->get_meta('_license_key');
 
         if (!empty($license_key)) {
@@ -210,4 +243,4 @@ function wc_license_display_admin_column_content($column) {
         }
     }
 }
-add_action('manage_shop_order_posts_custom_column', 'wc_license_display_admin_column_content', 10, 1);
+add_action('manage_woocommerce_page_wc-orders_custom_column', 'wc_license_display_admin_column_content_hpos', 10, 2);
