@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * Cada endpoint en su propio archivo
  * Todos los prompts en /prompts/
  *
- * @version 5.02
+ * @version 5.5
  */
 
 define('API_ACCESS', true);
