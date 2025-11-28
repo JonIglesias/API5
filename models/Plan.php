@@ -34,7 +34,7 @@ class Plan {
      * Obtener todos los planes activos
      */
     public function getActive() {
-        $sql = "SELECT * FROM " . DB_PREFIX . "plans WHERE active = 1 ORDER BY tokens_per_month ASC";
+        $sql = "SELECT * FROM " . DB_PREFIX . "plans WHERE is_active = 1 ORDER BY tokens_per_month ASC";
         return $this->db->fetchAll($sql);
     }
     
