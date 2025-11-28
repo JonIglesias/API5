@@ -144,7 +144,28 @@ class WooCommerceClient {
             'status' => ['processing', 'completed']
         ]);
     }
-    
+
+    /**
+     * Actualizar meta data de un pedido
+     *
+     * @param int $orderId ID del pedido en WooCommerce
+     * @param string $key Clave del meta field
+     * @param mixed $value Valor del meta field
+     * @return array Respuesta de la API
+     */
+    public function updateOrderMeta($orderId, $key, $value) {
+        $data = [
+            'meta_data' => [
+                [
+                    'key' => $key,
+                    'value' => $value
+                ]
+            ]
+        ];
+
+        return $this->put("orders/{$orderId}", $data);
+    }
+
     /**
      * Realizar petición HTTP
      */

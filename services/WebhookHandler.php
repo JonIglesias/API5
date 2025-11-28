@@ -13,18 +13,21 @@ defined('API_ACCESS') or die('Direct access not permitted');
 require_once API_BASE_DIR . '/models/License.php';
 require_once API_BASE_DIR . '/models/Plan.php';
 require_once API_BASE_DIR . '/services/TokenManager.php';
+require_once API_BASE_DIR . '/core/WooCommerceClient.php';
 
 class WebhookHandler {
     private $licenseModel;
     private $planModel;
     private $tokenManager;
     private $db;
+    private $wc;
 
     public function __construct() {
         $this->licenseModel = new License();
         $this->planModel = new Plan();
         $this->tokenManager = new TokenManager();
         $this->db = Database::getInstance();
+        $this->wc = new WooCommerceClient();
     }
     
     /**
@@ -399,6 +402,23 @@ class WebhookHandler {
                     'order_id' => $orderId
                 ]);
 
+                // Actualizar pedido en WooCommerce con la license_key (por si no la tenía)
+                try {
+                    $this->wc->updateOrderMeta($orderId, '_license_key', $existing['license_key']);
+
+                    Logger::webhook('info', 'Order updated with license key in WooCommerce', [
+                        'order_id' => $orderId,
+                        'license_key' => $existing['license_key']
+                    ]);
+                } catch (Exception $e) {
+                    // No romper el flujo si falla la actualización en WooCommerce
+                    Logger::webhook('warning', 'Failed to update order meta in WooCommerce', [
+                        'order_id' => $orderId,
+                        'license_key' => $existing['license_key'],
+                        'error' => $e->getMessage()
+                    ]);
+                }
+
             } else {
                 // Crear nueva licencia
                 $licenseKey = $this->generateLicenseKey($plan['id']);
@@ -436,6 +456,23 @@ class WebhookHandler {
                     'email' => $email,
                     'plan' => $plan['id']
                 ]);
+
+                // Actualizar pedido en WooCommerce con la license_key
+                try {
+                    $this->wc->updateOrderMeta($orderId, '_license_key', $licenseKey);
+
+                    Logger::webhook('info', 'Order updated with license key in WooCommerce', [
+                        'order_id' => $orderId,
+                        'license_key' => $licenseKey
+                    ]);
+                } catch (Exception $e) {
+                    // No romper el flujo si falla la actualización en WooCommerce
+                    Logger::webhook('warning', 'Failed to update order meta in WooCommerce', [
+                        'order_id' => $orderId,
+                        'license_key' => $licenseKey,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
         }
     }
