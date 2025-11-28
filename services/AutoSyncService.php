@@ -16,6 +16,7 @@ require_once API_BASE_DIR . '/core/Logger.php';
 require_once API_BASE_DIR . '/models/License.php';
 require_once API_BASE_DIR . '/models/Plan.php';
 require_once API_BASE_DIR . '/services/TokenManager.php';
+require_once API_BASE_DIR . '/services/LicenseKeySyncService.php';
 
 class AutoSyncService {
     private $wc;
@@ -23,6 +24,7 @@ class AutoSyncService {
     private $planModel;
     private $tokenManager;
     private $db;
+    private $licenseSyncService;
 
     public function __construct() {
         $this->wc = new WooCommerceClient();
@@ -30,6 +32,7 @@ class AutoSyncService {
         $this->planModel = new Plan();
         $this->tokenManager = new TokenManager();
         $this->db = Database::getInstance();
+        $this->licenseSyncService = new LicenseKeySyncService();
     }
 
     /**
@@ -89,6 +92,9 @@ class AutoSyncService {
             }
 
             Logger::sync('info', 'Auto-sync completed', $results);
+
+            // Sincronizar license_keys pendientes a WooCommerce
+            $this->syncPendingLicenseKeys($results);
 
         } catch (Exception $e) {
             Logger::sync('error', 'Auto-sync failed', ['error' => $e->getMessage()]);
@@ -154,6 +160,9 @@ class AutoSyncService {
             }
 
             Logger::sync('info', 'Recent auto-sync completed', $results);
+
+            // Sincronizar license_keys pendientes a WooCommerce
+            $this->syncPendingLicenseKeys($results);
 
         } catch (Exception $e) {
             Logger::sync('error', 'Recent auto-sync failed', ['error' => $e->getMessage()]);
@@ -682,6 +691,32 @@ class AutoSyncService {
             Logger::sync('error', 'Failed to log cron summary', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Sincronizar license_keys pendientes a WooCommerce
+     * Se ejecuta automáticamente después de cada sync de licencias
+     */
+    private function syncPendingLicenseKeys(&$results) {
+        try {
+            $syncResults = $this->licenseSyncService->syncPendingLicenseKeys(50);
+
+            // Añadir a los resultados generales
+            if ($syncResults['synced'] > 0) {
+                $results['details'][] = "License keys synced to WooCommerce: {$syncResults['synced']}";
+            }
+
+            if ($syncResults['failed'] > 0) {
+                $results['details'][] = "License keys sync failed: {$syncResults['failed']} (will retry)";
+            }
+
+            Logger::sync('info', 'License keys sync completed', $syncResults);
+
+        } catch (Exception $e) {
+            Logger::sync('error', 'License keys sync failed', [
+                'error' => $e->getMessage()
             ]);
         }
     }
