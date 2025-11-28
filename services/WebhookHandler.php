@@ -14,6 +14,7 @@ require_once API_BASE_DIR . '/models/License.php';
 require_once API_BASE_DIR . '/models/Plan.php';
 require_once API_BASE_DIR . '/services/TokenManager.php';
 require_once API_BASE_DIR . '/core/WooCommerceClient.php';
+require_once API_BASE_DIR . '/services/LicenseKeySyncService.php';
 
 class WebhookHandler {
     private $licenseModel;
@@ -21,6 +22,7 @@ class WebhookHandler {
     private $tokenManager;
     private $db;
     private $wc;
+    private $licenseSyncService;
 
     public function __construct() {
         $this->licenseModel = new License();
@@ -28,6 +30,7 @@ class WebhookHandler {
         $this->tokenManager = new TokenManager();
         $this->db = Database::getInstance();
         $this->wc = new WooCommerceClient();
+        $this->licenseSyncService = new LicenseKeySyncService();
     }
     
     /**
@@ -402,20 +405,21 @@ class WebhookHandler {
                     'order_id' => $orderId
                 ]);
 
-                // Actualizar pedido en WooCommerce con la license_key (por si no la tenía)
-                try {
-                    $this->wc->updateOrderMeta($orderId, '_license_key', $existing['license_key']);
+                // Intentar sincronizar license_key a WooCommerce (con reintentos automáticos)
+                $syncResult = $this->licenseSyncService->syncLicenseKey($existing['id']);
 
-                    Logger::webhook('info', 'Order updated with license key in WooCommerce', [
+                if ($syncResult['success']) {
+                    Logger::webhook('info', 'License key synced to WooCommerce', [
+                        'license_id' => $existing['id'],
                         'order_id' => $orderId,
-                        'license_key' => $existing['license_key']
+                        'attempts' => $syncResult['attempts'] ?? 1
                     ]);
-                } catch (Exception $e) {
-                    // No romper el flujo si falla la actualización en WooCommerce
-                    Logger::webhook('warning', 'Failed to update order meta in WooCommerce', [
+                } else {
+                    Logger::webhook('warning', 'License key sync failed, will retry later', [
+                        'license_id' => $existing['id'],
                         'order_id' => $orderId,
-                        'license_key' => $existing['license_key'],
-                        'error' => $e->getMessage()
+                        'message' => $syncResult['message'] ?? 'Unknown error',
+                        'will_retry' => $syncResult['will_retry'] ?? false
                     ]);
                 }
 
@@ -450,32 +454,33 @@ class WebhookHandler {
                     'updated_at' => date(DATE_FORMAT)
                 ]);
 
+                $newLicenseId = $this->db->getLastInsertId();
+
                 Logger::webhook('info', 'License created from order', [
+                    'license_id' => $newLicenseId,
                     'license_key' => $licenseKey,
                     'order_id' => $orderId,
                     'email' => $email,
                     'plan' => $plan['id']
                 ]);
 
-                // Actualizar pedido en WooCommerce con la license_key
-                Logger::webhook('info', 'Attempting to update WooCommerce order with license key', [
-                    'order_id' => $orderId,
-                    'license_key' => $licenseKey
-                ]);
+                // Intentar sincronizar license_key a WooCommerce (con reintentos automáticos)
+                $syncResult = $this->licenseSyncService->syncLicenseKey($newLicenseId);
 
-                try {
-                    $this->wc->updateOrderMeta($orderId, '_license_key', $licenseKey);
-
-                    Logger::webhook('info', 'Order updated with license key in WooCommerce', [
-                        'order_id' => $orderId,
-                        'license_key' => $licenseKey
-                    ]);
-                } catch (Exception $e) {
-                    // No romper el flujo si falla la actualización en WooCommerce
-                    Logger::webhook('warning', 'Failed to update order meta in WooCommerce', [
+                if ($syncResult['success']) {
+                    Logger::webhook('info', 'License key synced to WooCommerce', [
+                        'license_id' => $newLicenseId,
                         'order_id' => $orderId,
                         'license_key' => $licenseKey,
-                        'error' => $e->getMessage()
+                        'attempts' => $syncResult['attempts'] ?? 1
+                    ]);
+                } else {
+                    Logger::webhook('warning', 'License key sync failed, will retry later', [
+                        'license_id' => $newLicenseId,
+                        'order_id' => $orderId,
+                        'license_key' => $licenseKey,
+                        'message' => $syncResult['message'] ?? 'Unknown error',
+                        'will_retry' => $syncResult['will_retry'] ?? false
                     ]);
                 }
             }
