@@ -744,7 +744,7 @@ try {
         try {
             require_once $baseDir . '/models/Plan.php';
             
-            $plans = $db->query("SELECT * FROM " . DB_PREFIX . "plans WHERE woo_product_id IS NOT NULL AND woo_product_id > 0 AND active = 1");
+            $plans = $db->query("SELECT * FROM " . DB_PREFIX . "plans WHERE woo_product_id IS NOT NULL AND woo_product_id > 0 AND is_active = 1");
             
             if (empty($plans)) {
                 echo json_encode([
