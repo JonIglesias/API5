@@ -167,6 +167,23 @@ class WooCommerceClient {
     }
 
     /**
+     * Crear una nota en un pedido
+     *
+     * @param int $orderId ID del pedido en WooCommerce
+     * @param string $note Texto de la nota
+     * @param bool $customerNote Si true, envía email al cliente
+     * @return array Respuesta de la API
+     */
+    public function createOrderNote($orderId, $note, $customerNote = false) {
+        $data = [
+            'note' => $note,
+            'customer_note' => $customerNote
+        ];
+
+        return $this->post("orders/{$orderId}/notes", $data);
+    }
+
+    /**
      * Realizar petición HTTP
      */
     private function request($method, $endpoint, $params = [], $data = []) {

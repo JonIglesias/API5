@@ -136,6 +136,9 @@ class LicenseKeySyncService {
                         'attempts' => $license['license_key_sync_attempts'] + 1
                     ]);
 
+                    // Enviar nota al cliente con email
+                    $this->sendCustomerNotification($orderId, $license['license_key']);
+
                     return [
                         'success' => true,
                         'message' => 'License key synced successfully',
@@ -280,5 +283,47 @@ class LicenseKeySyncService {
         Logger::sync('info', 'License sync status reset', [
             'license_id' => $licenseId
         ]);
+    }
+
+    /**
+     * Enviar notificación al cliente vía WooCommerce Customer Note
+     * La nota con customer_note=true dispara automáticamente un email al cliente
+     *
+     * @param int $orderId ID del pedido en WooCommerce
+     * @param string $licenseKey Clave de licencia
+     */
+    private function sendCustomerNotification($orderId, $licenseKey) {
+        try {
+            // Crear mensaje personalizado
+            $message = "🔑 ¡Tu clave de licencia está lista!\n\n";
+            $message .= "CLAVE DE LICENCIA: {$licenseKey}\n\n";
+            $message .= "Guarda esta clave en un lugar seguro. La necesitarás para activar tu producto.\n\n";
+            $message .= "También puedes consultar tu clave en cualquier momento accediendo a los detalles de este pedido desde tu cuenta.";
+
+            // Enviar nota al cliente (customer_note=true envía email automáticamente)
+            $result = $this->wc->createOrderNote($orderId, $message, true);
+
+            // Verificar que se creó correctamente
+            if (isset($result['id']) && $result['id'] > 0) {
+                Logger::sync('info', 'Customer notification email sent successfully', [
+                    'order_id' => $orderId,
+                    'note_id' => $result['id'],
+                    'license_key' => $licenseKey
+                ]);
+            } else {
+                throw new Exception('Order note created but no ID returned');
+            }
+
+        } catch (Exception $e) {
+            // Si falla el envío de la nota, registrar el error pero NO fallar la sincronización
+            // La licencia ya está en WooCommerce y el cliente puede verla en su pedido
+            Logger::sync('warning', 'Failed to send customer notification email', [
+                'order_id' => $orderId,
+                'license_key' => $licenseKey,
+                'error' => $e->getMessage()
+            ]);
+
+            // No lanzamos la excepción para que la sincronización se considere exitosa
+        }
     }
 }
