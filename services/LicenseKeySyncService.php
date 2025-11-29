@@ -180,7 +180,10 @@ class LicenseKeySyncService {
                   license_key_last_sync_attempt IS NULL
                   OR license_key_last_sync_attempt < DATE_SUB(NOW(), INTERVAL ? SECOND)
               )
-              AND (woo_subscription_id IS NOT NULL OR last_order_id IS NOT NULL)
+              AND (
+                  (woo_subscription_id IS NOT NULL AND woo_subscription_id != '' AND woo_subscription_id > 0)
+                  OR (last_order_id IS NOT NULL AND last_order_id != '' AND last_order_id > 0)
+              )
             ORDER BY created_at DESC
             LIMIT ?
         ", [self::MAX_ATTEMPTS, self::RETRY_DELAY_SECONDS, $limit]);
@@ -228,12 +231,15 @@ class LicenseKeySyncService {
             WHERE license_key_synced_to_woo = 1
         ")['count'];
 
-        // Licencias pendientes
+        // Licencias pendientes (con order_id válido)
         $stats['pending'] = $this->db->fetchOne("
             SELECT COUNT(*) as count FROM " . DB_PREFIX . "licenses
             WHERE license_key_synced_to_woo = 0
               AND license_key_sync_attempts < ?
-              AND (woo_subscription_id IS NOT NULL OR last_order_id IS NOT NULL)
+              AND (
+                  (woo_subscription_id IS NOT NULL AND woo_subscription_id != '' AND woo_subscription_id > 0)
+                  OR (last_order_id IS NOT NULL AND last_order_id != '' AND last_order_id > 0)
+              )
         ", [self::MAX_ATTEMPTS])['count'];
 
         // Licencias que alcanzaron el máximo de intentos
@@ -243,12 +249,14 @@ class LicenseKeySyncService {
               AND license_key_sync_attempts >= ?
         ", [self::MAX_ATTEMPTS])['count'];
 
-        // Licencias sin order_id (no se pueden sincronizar)
+        // Licencias sin order_id válido (no se pueden sincronizar)
         $stats['no_order_id'] = $this->db->fetchOne("
             SELECT COUNT(*) as count FROM " . DB_PREFIX . "licenses
             WHERE license_key_synced_to_woo = 0
-              AND woo_subscription_id IS NULL
-              AND last_order_id IS NULL
+              AND (
+                  (woo_subscription_id IS NULL OR woo_subscription_id = '' OR woo_subscription_id = 0)
+                  AND (last_order_id IS NULL OR last_order_id = '' OR last_order_id = 0)
+              )
         ")['count'];
 
         return $stats;

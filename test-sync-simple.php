@@ -55,7 +55,10 @@ try {
         FROM " . DB_PREFIX . "licenses
         WHERE license_key_synced_to_woo = 0
           AND license_key_sync_attempts < 5
-          AND (woo_subscription_id IS NOT NULL OR last_order_id IS NOT NULL)
+          AND (
+              (woo_subscription_id IS NOT NULL AND woo_subscription_id != '' AND woo_subscription_id > 0)
+              OR (last_order_id IS NOT NULL AND last_order_id != '' AND last_order_id > 0)
+          )
         LIMIT 5
     ");
     echo "   ✓ Encontradas: " . count($pending) . " licencias\n\n";
