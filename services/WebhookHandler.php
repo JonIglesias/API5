@@ -454,7 +454,7 @@ class WebhookHandler {
                     'updated_at' => date(DATE_FORMAT)
                 ]);
 
-                $newLicenseId = $this->db->getLastInsertId();
+                $newLicenseId = $this->db->lastInsertId();
 
                 Logger::webhook('info', 'License created from order', [
                     'license_id' => $newLicenseId,
