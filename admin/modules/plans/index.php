@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'tokens_per_month' => $tokens_per_month,
                 'woo_product_id' => $woo_product_id,
                 'billing_cycle' => $billing_cycle,
-                'active' => $active,
+                'is_active' => $active,
                 'post_generation_delay' => $post_generation_delay,
                 'api_timeout' => $api_timeout,
                 'max_retries' => $max_retries,
@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $stmt = $db->prepare("
                     UPDATE " . DB_PREFIX . "plans
-                    SET name=?, tokens_per_month=?, woo_product_id=?, billing_cycle=?, active=?,
+                    SET name=?, tokens_per_month=?, woo_product_id=?, billing_cycle=?, is_active=?,
                         post_generation_delay=?, api_timeout=?, max_retries=?,
                         requests_per_day=?, requests_per_month=?, max_words_per_request=?, max_campaigns=?,
                         max_posts_per_campaign=?, price=?, currency=?
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'toggle_active') {
         $id = $_POST['plan_id'] ?? '';
         try {
-            $stmt = $db->prepare("UPDATE " . DB_PREFIX . "plans SET active = IF(active = 1, 0, 1) WHERE id=?");
+            $stmt = $db->prepare("UPDATE " . DB_PREFIX . "plans SET is_active = IF(is_active = 1, 0, 1) WHERE id=?");
             $stmt->execute([$id]);
             $success = true;
             $message = "Estado del plan actualizado";
@@ -430,8 +430,8 @@ code {
                 
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" name="active" 
-                               <?= ($editPlan['active'] ?? 1) ? 'checked' : '' ?>>
+                        <input type="checkbox" name="active"
+                               <?= ($editPlan['is_active'] ?? 1) ? 'checked' : '' ?>>
                         Plan activo
                     </label>
                 </div>
@@ -489,8 +489,8 @@ code {
                             <td><?= ($plan['api_timeout'] ?? 120) ?> seg</td>
                             <td>#<?= $plan['woo_product_id'] ?></td>
                             <td>
-                                <span class="badge badge-<?= $plan['active'] ? 'success' : 'secondary' ?>">
-                                    <?= $plan['active'] ? 'Activo' : 'Inactivo' ?>
+                                <span class="badge badge-<?= $plan['is_active'] ? 'success' : 'secondary' ?>">
+                                    <?= $plan['is_active'] ? 'Activo' : 'Inactivo' ?>
                                 </span>
                             </td>
                             <td><?= $licenseCount ?></td>
@@ -502,7 +502,7 @@ code {
                                         <input type="hidden" name="action" value="toggle_active">
                                         <input type="hidden" name="plan_id" value="<?= $plan['id'] ?>">
                                         <button type="submit" class="btn btn-sm btn-warning">
-                                            <?= $plan['active'] ? 'Desactivar' : 'Activar' ?>
+                                            <?= $plan['is_active'] ? 'Desactivar' : 'Activar' ?>
                                         </button>
                                     </form>
                                     
