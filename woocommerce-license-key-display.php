@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.4
+ * Version: 2.0.5
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -448,10 +448,16 @@ function wc_shortcode_payment_methods($atts) {
             echo '<p>' . __('No tienes métodos de pago guardados.', 'wc-license-display') . '</p>';
         }
         ?>
-        <button type="button" class="button wc-load-form-btn" data-form="payment-methods">
-            <?php _e('Gestionar métodos de pago', 'wc-license-display'); ?>
-        </button>
+        <div class="payment-methods-buttons">
+            <button type="button" class="button wc-load-form-btn" data-form="payment-methods">
+                <?php _e('Gestionar métodos de pago', 'wc-license-display'); ?>
+            </button>
+            <button type="button" class="button button-secondary wc-load-form-btn" data-form="add-payment-method">
+                <?php _e('Añadir método de pago', 'wc-license-display'); ?>
+            </button>
+        </div>
         <div class="wc-dynamic-form-container" id="form-container-payment-methods" style="display: none;"></div>
+        <div class="wc-dynamic-form-container" id="form-container-add-payment-method" style="display: none;"></div>
     </div>
     <?php
         return ob_get_clean();
@@ -931,25 +937,61 @@ function wc_load_dynamic_form_ajax() {
             case 'edit-address-billing':
                 // Cargar el formulario de editar dirección de facturación
                 if (function_exists('wc_get_template')) {
-                    WC()->countries->get_country_locale();
                     $load_address = 'billing';
-                    wc_get_template('myaccount/form-edit-address.php', array('load_address' => $load_address));
+                    $customer = new WC_Customer(get_current_user_id());
+
+                    // Obtener campos de dirección de facturación
+                    $address = WC()->countries->get_address_fields(
+                        $customer->get_billing_country(),
+                        'billing_'
+                    );
+
+                    wc_get_template('myaccount/form-edit-address.php', array(
+                        'load_address' => $load_address,
+                        'address' => $address
+                    ));
                 }
                 break;
 
             case 'edit-address-shipping':
                 // Cargar el formulario de editar dirección de envío
                 if (function_exists('wc_get_template')) {
-                    WC()->countries->get_country_locale();
                     $load_address = 'shipping';
-                    wc_get_template('myaccount/form-edit-address.php', array('load_address' => $load_address));
+                    $customer = new WC_Customer(get_current_user_id());
+
+                    // Obtener campos de dirección de envío
+                    $address = WC()->countries->get_address_fields(
+                        $customer->get_shipping_country(),
+                        'shipping_'
+                    );
+
+                    wc_get_template('myaccount/form-edit-address.php', array(
+                        'load_address' => $load_address,
+                        'address' => $address
+                    ));
                 }
                 break;
 
             case 'payment-methods':
                 // Cargar el formulario de métodos de pago
                 if (function_exists('wc_get_template')) {
-                    wc_get_template('myaccount/payment-methods.php');
+                    // Obtener métodos de pago guardados
+                    $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
+
+                    // Obtener gateways de pago que soportan tokenización
+                    $has_methods = (bool) $saved_methods;
+
+                    wc_get_template('myaccount/payment-methods.php', array(
+                        'saved_methods' => $saved_methods,
+                        'has_methods' => $has_methods
+                    ));
+                }
+                break;
+
+            case 'add-payment-method':
+                // Cargar formulario para añadir nuevo método de pago
+                if (function_exists('wc_get_template')) {
+                    wc_get_template('myaccount/form-add-payment-method.php');
                 }
                 break;
 
@@ -1147,6 +1189,13 @@ function wc_shortcodes_enqueue_styles() {
             border-radius: 12px;
             font-size: 12px;
             font-weight: 600;
+        }
+
+        .payment-methods-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
         }
 
         /* Orders and Subscriptions */
