@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.3
+ * Version: 2.0.4
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -290,9 +290,10 @@ function wc_shortcode_account_details($atts) {
                     <span class="value"><?php echo esc_html($user->user_login); ?></span>
                 </div>
             </div>
-            <a href="<?php echo esc_url(wc_get_endpoint_url('edit-account', '', wc_get_page_permalink('myaccount'))); ?>" class="button">
+            <button type="button" class="button wc-load-form-btn" data-form="edit-account">
                 <?php _e('Editar mis datos', 'wc-license-display'); ?>
-            </a>
+            </button>
+            <div class="wc-dynamic-form-container" id="form-container-edit-account" style="display: none;"></div>
         </div>
         <?php
         return ob_get_clean();
@@ -355,9 +356,10 @@ function wc_shortcode_addresses($atts) {
                     echo '<p class="no-address">' . __('No has configurado una dirección de facturación.', 'wc-license-display') . '</p>';
                 }
                 ?>
-                <a href="<?php echo esc_url(wc_get_endpoint_url('edit-address', 'billing', wc_get_page_permalink('myaccount'))); ?>" class="button">
+                <button type="button" class="button wc-load-form-btn" data-form="edit-address-billing">
                     <?php _e('Editar', 'wc-license-display'); ?>
-                </a>
+                </button>
+                <div class="wc-dynamic-form-container" id="form-container-edit-address-billing" style="display: none;"></div>
             </div>
 
             <!-- Dirección de envío -->
@@ -389,9 +391,10 @@ function wc_shortcode_addresses($atts) {
                     echo '<p class="no-address">' . __('No has configurado una dirección de envío.', 'wc-license-display') . '</p>';
                 }
                 ?>
-                <a href="<?php echo esc_url(wc_get_endpoint_url('edit-address', 'shipping', wc_get_page_permalink('myaccount'))); ?>" class="button">
+                <button type="button" class="button wc-load-form-btn" data-form="edit-address-shipping">
                     <?php _e('Editar', 'wc-license-display'); ?>
-                </a>
+                </button>
+                <div class="wc-dynamic-form-container" id="form-container-edit-address-shipping" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -445,9 +448,10 @@ function wc_shortcode_payment_methods($atts) {
             echo '<p>' . __('No tienes métodos de pago guardados.', 'wc-license-display') . '</p>';
         }
         ?>
-        <a href="<?php echo esc_url(wc_get_endpoint_url('payment-methods', '', wc_get_page_permalink('myaccount'))); ?>" class="button">
+        <button type="button" class="button wc-load-form-btn" data-form="payment-methods">
             <?php _e('Gestionar métodos de pago', 'wc-license-display'); ?>
-        </a>
+        </button>
+        <div class="wc-dynamic-form-container" id="form-container-payment-methods" style="display: none;"></div>
     </div>
     <?php
         return ob_get_clean();
@@ -456,6 +460,222 @@ function wc_shortcode_payment_methods($atts) {
     }
 }
 add_shortcode('wc_payment_methods', 'wc_shortcode_payment_methods');
+
+
+/**
+ * Shortcode: [wc_downloads]
+ * Muestra los archivos descargables disponibles para el cliente
+ */
+function wc_shortcode_downloads($atts) {
+    // Verificar que WooCommerce esté activo
+    if (!function_exists('WC') || !function_exists('wc_get_customer_available_downloads')) {
+        return '<p style="color: red;">Error: WooCommerce no está activo.</p>';
+    }
+
+    if (!is_user_logged_in()) {
+        return '<p>' . __('Debes iniciar sesión para ver esta información.', 'wc-license-display') . '</p>';
+    }
+
+    try {
+        $downloads = wc_get_customer_available_downloads(get_current_user_id());
+
+        ob_start();
+        ?>
+        <div class="wc-downloads-shortcode">
+            <h2><?php _e('Mis Descargas', 'wc-license-display'); ?></h2>
+
+            <?php if (!empty($downloads)) : ?>
+                <div class="downloads-list">
+                    <?php foreach ($downloads as $download) : ?>
+                        <div class="download-item">
+                            <div class="download-info">
+                                <h3 class="download-name"><?php echo esc_html($download['product_name']); ?></h3>
+                                <p class="download-file-name"><?php echo esc_html($download['download_name']); ?></p>
+
+                                <div class="download-meta">
+                                    <?php if ($download['downloads_remaining']) : ?>
+                                        <span class="downloads-remaining">
+                                            <?php
+                                            printf(
+                                                esc_html__('Descargas restantes: %s', 'wc-license-display'),
+                                                $download['downloads_remaining'] === '' ? '∞' : esc_html($download['downloads_remaining'])
+                                            );
+                                            ?>
+                                        </span>
+                                    <?php endif; ?>
+
+                                    <?php if ($download['access_expires']) : ?>
+                                        <span class="access-expires">
+                                            <?php
+                                            printf(
+                                                esc_html__('Expira: %s', 'wc-license-display'),
+                                                esc_html(date_i18n('d/m/Y', strtotime($download['access_expires'])))
+                                            );
+                                            ?>
+                                        </span>
+                                    <?php else : ?>
+                                        <span class="access-expires">
+                                            <?php _e('Sin fecha de expiración', 'wc-license-display'); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <div class="download-action">
+                                <a href="<?php echo esc_url($download['download_url']); ?>"
+                                   class="button download-button">
+                                    📥 <?php _e('Descargar', 'wc-license-display'); ?>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else : ?>
+                <p class="no-downloads"><?php _e('No tienes archivos disponibles para descargar.', 'wc-license-display'); ?></p>
+            <?php endif; ?>
+        </div>
+        <?php
+        return ob_get_clean();
+    } catch (Exception $e) {
+        return '<p style="color: red;">Error al cargar descargas: ' . esc_html($e->getMessage()) . '</p>';
+    }
+}
+add_shortcode('wc_downloads', 'wc_shortcode_downloads');
+
+
+/**
+ * Shortcode: [wc_account_details_extended]
+ * Muestra información detallada de la cuenta del cliente (estilo WooCommerce)
+ */
+function wc_shortcode_account_details_extended($atts) {
+    // Verificar que WooCommerce esté activo
+    if (!function_exists('WC') || !class_exists('WC_Customer')) {
+        return '<p style="color: red;">Error: WooCommerce no está activo.</p>';
+    }
+
+    if (!is_user_logged_in()) {
+        return '<p>' . __('Debes iniciar sesión para ver esta información.', 'wc-license-display') . '</p>';
+    }
+
+    try {
+        $user = wp_get_current_user();
+        $customer = new WC_Customer($user->ID);
+
+        // Obtener estadísticas del cliente
+        $customer_orders = wc_get_orders(array(
+            'customer' => get_current_user_id(),
+            'limit' => -1,
+        ));
+
+        $total_spent = 0;
+        foreach ($customer_orders as $order) {
+            $total_spent += $order->get_total();
+        }
+
+        ob_start();
+        ?>
+        <div class="wc-account-details-extended-shortcode">
+            <h2><?php _e('Detalles de la Cuenta', 'wc-license-display'); ?></h2>
+
+            <!-- Información Personal -->
+            <div class="account-section">
+                <h3><?php _e('Información Personal', 'wc-license-display'); ?></h3>
+                <div class="account-info-grid">
+                    <div class="info-item">
+                        <span class="label"><?php _e('Nombre completo:', 'wc-license-display'); ?></span>
+                        <span class="value"><?php echo esc_html($customer->get_first_name() . ' ' . $customer->get_last_name()); ?></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><?php _e('Nombre de usuario:', 'wc-license-display'); ?></span>
+                        <span class="value"><?php echo esc_html($user->user_login); ?></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><?php _e('Email:', 'wc-license-display'); ?></span>
+                        <span class="value"><?php echo esc_html($customer->get_email()); ?></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label"><?php _e('Teléfono:', 'wc-license-display'); ?></span>
+                        <span class="value"><?php echo esc_html($customer->get_billing_phone() ?: '-'); ?></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas -->
+            <div class="account-section">
+                <h3><?php _e('Estadísticas', 'wc-license-display'); ?></h3>
+                <div class="account-stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value"><?php echo count($customer_orders); ?></div>
+                        <div class="stat-label"><?php _e('Pedidos Totales', 'wc-license-display'); ?></div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><?php echo wc_price($total_spent); ?></div>
+                        <div class="stat-label"><?php _e('Total Gastado', 'wc-license-display'); ?></div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><?php echo esc_html(date_i18n('d/m/Y', strtotime($user->user_registered))); ?></div>
+                        <div class="stat-label"><?php _e('Cliente Desde', 'wc-license-display'); ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Direcciones Resumidas -->
+            <div class="account-section">
+                <h3><?php _e('Direcciones', 'wc-license-display'); ?></h3>
+                <div class="addresses-summary-grid">
+                    <div class="address-summary">
+                        <h4><?php _e('Facturación', 'wc-license-display'); ?></h4>
+                        <?php
+                        $billing_address = $customer->get_billing_address_1();
+                        if ($billing_address) {
+                            echo '<p>' . esc_html($billing_address) . '</p>';
+                            echo '<p>' . esc_html($customer->get_billing_city() . ', ' . $customer->get_billing_postcode()) . '</p>';
+                        } else {
+                            echo '<p class="no-data">' . __('No configurada', 'wc-license-display') . '</p>';
+                        }
+                        ?>
+                        <button type="button" class="button-small wc-load-form-btn" data-form="edit-address-billing">
+                            <?php _e('Editar', 'wc-license-display'); ?>
+                        </button>
+                        <div class="wc-dynamic-form-container" id="form-container-ext-billing" style="display: none;"></div>
+                    </div>
+                    <div class="address-summary">
+                        <h4><?php _e('Envío', 'wc-license-display'); ?></h4>
+                        <?php
+                        $shipping_address = $customer->get_shipping_address_1();
+                        if ($shipping_address) {
+                            echo '<p>' . esc_html($shipping_address) . '</p>';
+                            echo '<p>' . esc_html($customer->get_shipping_city() . ', ' . $customer->get_shipping_postcode()) . '</p>';
+                        } else {
+                            echo '<p class="no-data">' . __('No configurada', 'wc-license-display') . '</p>';
+                        }
+                        ?>
+                        <button type="button" class="button-small wc-load-form-btn" data-form="edit-address-shipping">
+                            <?php _e('Editar', 'wc-license-display'); ?>
+                        </button>
+                        <div class="wc-dynamic-form-container" id="form-container-ext-shipping" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="account-actions">
+                <button type="button" class="button wc-load-form-btn" data-form="edit-account">
+                    <?php _e('Editar Cuenta', 'wc-license-display'); ?>
+                </button>
+                <a href="<?php echo esc_url(wp_logout_url(home_url())); ?>" class="button button-secondary">
+                    <?php _e('Cerrar Sesión', 'wc-license-display'); ?>
+                </a>
+            </div>
+            <div class="wc-dynamic-form-container" id="form-container-ext-account" style="display: none;"></div>
+        </div>
+        <?php
+        return ob_get_clean();
+    } catch (Exception $e) {
+        return '<p style="color: red;">Error al cargar detalles de cuenta: ' . esc_html($e->getMessage()) . '</p>';
+    }
+}
+add_shortcode('wc_account_details_extended', 'wc_shortcode_account_details_extended');
 
 
 /**
@@ -671,6 +891,172 @@ function wc_shortcode_orders_with_subscriptions($atts) {
     }
 }
 add_shortcode('wc_orders_with_subscriptions', 'wc_shortcode_orders_with_subscriptions');
+
+
+// ============================================================================
+// AJAX HANDLER PARA CARGAR FORMULARIOS DINÁMICAMENTE
+// ============================================================================
+
+/**
+ * Handler AJAX para cargar formularios de WooCommerce
+ */
+function wc_load_dynamic_form_ajax() {
+    // Verificar nonce
+    check_ajax_referer('wc_load_form', 'nonce');
+
+    // Verificar que el usuario esté logueado
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => __('Debes iniciar sesión.', 'wc-license-display')));
+        return;
+    }
+
+    $form_type = isset($_POST['form_type']) ? sanitize_text_field($_POST['form_type']) : '';
+
+    if (empty($form_type)) {
+        wp_send_json_error(array('message' => __('Tipo de formulario no especificado.', 'wc-license-display')));
+        return;
+    }
+
+    ob_start();
+
+    try {
+        switch ($form_type) {
+            case 'edit-account':
+                // Cargar el formulario de editar cuenta
+                if (function_exists('wc_get_template')) {
+                    wc_get_template('myaccount/form-edit-account.php');
+                }
+                break;
+
+            case 'edit-address-billing':
+                // Cargar el formulario de editar dirección de facturación
+                if (function_exists('wc_get_template')) {
+                    WC()->countries->get_country_locale();
+                    $load_address = 'billing';
+                    wc_get_template('myaccount/form-edit-address.php', array('load_address' => $load_address));
+                }
+                break;
+
+            case 'edit-address-shipping':
+                // Cargar el formulario de editar dirección de envío
+                if (function_exists('wc_get_template')) {
+                    WC()->countries->get_country_locale();
+                    $load_address = 'shipping';
+                    wc_get_template('myaccount/form-edit-address.php', array('load_address' => $load_address));
+                }
+                break;
+
+            case 'payment-methods':
+                // Cargar el formulario de métodos de pago
+                if (function_exists('wc_get_template')) {
+                    wc_get_template('myaccount/payment-methods.php');
+                }
+                break;
+
+            default:
+                wp_send_json_error(array('message' => __('Formulario no reconocido.', 'wc-license-display')));
+                return;
+        }
+
+        $html = ob_get_clean();
+
+        if (empty($html)) {
+            wp_send_json_error(array('message' => __('No se pudo cargar el formulario.', 'wc-license-display')));
+        } else {
+            wp_send_json_success(array('html' => $html));
+        }
+
+    } catch (Exception $e) {
+        ob_end_clean();
+        wp_send_json_error(array('message' => $e->getMessage()));
+    }
+}
+add_action('wp_ajax_wc_load_dynamic_form', 'wc_load_dynamic_form_ajax');
+
+
+/**
+ * Añadir JavaScript para manejar la carga de formularios dinámicos
+ */
+function wc_shortcodes_enqueue_scripts() {
+    if (is_singular() || is_page()) {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Handler para botones de carga dinámica de formularios
+            $(document).on('click', '.wc-load-form-btn', function(e) {
+                e.preventDefault();
+
+                var button = $(this);
+                var formType = button.data('form');
+                var container = button.siblings('.wc-dynamic-form-container').first();
+
+                // Si ya está visible, ocultarlo
+                if (container.is(':visible')) {
+                    container.slideUp(300);
+                    button.text(button.data('original-text') || button.text());
+                    return;
+                }
+
+                // Guardar texto original del botón
+                if (!button.data('original-text')) {
+                    button.data('original-text', button.text());
+                }
+
+                // Cambiar texto del botón
+                button.text('<?php echo esc_js(__('Cargando...', 'wc-license-display')); ?>');
+
+                // Petición AJAX
+                $.ajax({
+                    url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                    type: 'POST',
+                    data: {
+                        action: 'wc_load_dynamic_form',
+                        form_type: formType,
+                        nonce: '<?php echo wp_create_nonce('wc_load_form'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            container.html(response.data.html);
+                            container.slideDown(300);
+                            button.text('<?php echo esc_js(__('Ocultar', 'wc-license-display')); ?>');
+
+                            // Inicializar select2 si está disponible
+                            if (typeof $.fn.selectWoo !== 'undefined') {
+                                container.find('select').selectWoo();
+                            }
+
+                            // Trigger de WooCommerce para scripts adicionales
+                            $(document.body).trigger('country_to_state_changed');
+                        } else {
+                            alert(response.data.message || '<?php echo esc_js(__('Error al cargar el formulario.', 'wc-license-display')); ?>');
+                            button.text(button.data('original-text'));
+                        }
+                    },
+                    error: function() {
+                        alert('<?php echo esc_js(__('Error de conexión.', 'wc-license-display')); ?>');
+                        button.text(button.data('original-text'));
+                    }
+                });
+            });
+
+            // Manejar submit de formularios dinámicos
+            $(document).on('submit', '.wc-dynamic-form-container form', function(e) {
+                // Permitir el submit normal del formulario
+                // WooCommerce manejará la validación y guardado
+                var form = $(this);
+                var container = form.closest('.wc-dynamic-form-container');
+
+                // Mensaje de guardando
+                if (!form.find('.wc-saving-message').length) {
+                    form.prepend('<div class="wc-saving-message" style="padding: 10px; background: #f0f9ff; border: 1px solid #3498db; border-radius: 5px; margin-bottom: 15px;"><?php echo esc_js(__('Guardando cambios...', 'wc-license-display')); ?></div>');
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action('wp_footer', 'wc_shortcodes_enqueue_scripts');
 
 
 /**
@@ -967,6 +1353,296 @@ function wc_shortcodes_enqueue_styles() {
 
             .subscription-info-grid {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* Estilos para formularios dinámicos */
+        .wc-dynamic-form-container {
+            margin-top: 20px;
+            padding: 25px;
+            background: #ffffff;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .wc-dynamic-form-container form {
+            margin: 0;
+        }
+
+        .wc-dynamic-form-container .woocommerce-form-row {
+            margin-bottom: 15px;
+        }
+
+        .wc-dynamic-form-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .wc-dynamic-form-container input[type="text"],
+        .wc-dynamic-form-container input[type="email"],
+        .wc-dynamic-form-container input[type="password"],
+        .wc-dynamic-form-container input[type="tel"],
+        .wc-dynamic-form-container select,
+        .wc-dynamic-form-container textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .wc-dynamic-form-container input[type="text"]:focus,
+        .wc-dynamic-form-container input[type="email"]:focus,
+        .wc-dynamic-form-container input[type="password"]:focus,
+        .wc-dynamic-form-container input[type="tel"]:focus,
+        .wc-dynamic-form-container select:focus,
+        .wc-dynamic-form-container textarea:focus {
+            border-color: #3498db;
+            outline: none;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+
+        .wc-dynamic-form-container button[type="submit"],
+        .wc-dynamic-form-container input[type="submit"] {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 15px;
+        }
+
+        .wc-dynamic-form-container button[type="submit"]:hover,
+        .wc-dynamic-form-container input[type="submit"]:hover {
+            background: #218838;
+        }
+
+        .wc-dynamic-form-container .woocommerce-message,
+        .wc-dynamic-form-container .woocommerce-error {
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .wc-dynamic-form-container .woocommerce-message {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .wc-dynamic-form-container .woocommerce-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Botones pequeños */
+        .button-small {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.3s;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .button-small:hover {
+            background: #2980b9;
+        }
+
+        /* Account details extended */
+        .wc-account-details-extended-shortcode,
+        .wc-downloads-shortcode {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .account-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .account-section h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .account-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .addresses-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .address-summary {
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+        }
+
+        .address-summary h4 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        .address-summary p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .no-data {
+            color: #999;
+            font-style: italic;
+        }
+
+        .account-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .button-secondary {
+            background: #6c757d;
+        }
+
+        .button-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Downloads shortcode */
+        .downloads-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .download-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .download-info {
+            flex: 1;
+        }
+
+        .download-name {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+
+        .download-file-name {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .download-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+
+        .downloads-remaining {
+            color: #3498db;
+            font-weight: 600;
+        }
+
+        .access-expires {
+            color: #666;
+        }
+
+        .download-action .download-button {
+            background: #28a745;
+            padding: 12px 20px;
+            font-size: 14px;
+        }
+
+        .download-action .download-button:hover {
+            background: #218838;
+        }
+
+        .no-downloads {
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .account-stats-grid,
+            .addresses-summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .download-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .download-action {
+                width: 100%;
+            }
+
+            .download-action .download-button {
+                width: 100%;
             }
         }
         </style>
