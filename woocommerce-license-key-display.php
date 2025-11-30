@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.7
+ * Version: 2.0.8
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -978,26 +978,43 @@ function wc_load_dynamic_form_ajax() {
                 break;
 
             case 'payment-methods':
-                // Cargar el formulario de métodos de pago - usar template de WooCommerce
-                if (function_exists('wc_get_template')) {
-                    // Simular estar en la página My Account
-                    global $wp;
-                    $wp->query_vars['payment-methods'] = '';
+                // Cargar el formulario de métodos de pago - verificar pasarelas de pago
+                if (function_exists('wc_get_template') && function_exists('WC')) {
+                    // Verificar si hay pasarelas de pago disponibles
+                    $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
+                    $supports_tokenization = false;
+
+                    foreach ($available_gateways as $gateway) {
+                        if ($gateway->supports('tokenization')) {
+                            $supports_tokenization = true;
+                            break;
+                        }
+                    }
 
                     echo '<div class="woocommerce-MyAccount-paymentMethods">';
-                    echo '<p class="info-message">' . __('Aquí puedes gestionar tus métodos de pago guardados.', 'wc-license-display') . '</p>';
 
-                    $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
-                    $has_methods = (bool) $saved_methods;
+                    if (!$supports_tokenization) {
+                        echo '<p class="woocommerce-info">' . __('No hay pasarelas de pago configuradas que soporten métodos de pago guardados.', 'wc-license-display') . '</p>';
+                        echo '<p>' . __('Por favor, contacta al administrador del sitio para configurar métodos de pago.', 'wc-license-display') . '</p>';
+                    } else {
+                        echo '<p class="info-message">' . __('Aquí puedes gestionar tus métodos de pago guardados.', 'wc-license-display') . '</p>';
 
-                    // Usar el template nativo de WooCommerce
-                    wc_get_template(
-                        'myaccount/payment-methods.php',
-                        array(
-                            'saved_methods' => $saved_methods,
-                            'has_methods'   => $has_methods,
-                        )
-                    );
+                        // Simular estar en la página My Account
+                        global $wp;
+                        $wp->query_vars['payment-methods'] = '';
+
+                        $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
+                        $has_methods = (bool) $saved_methods;
+
+                        // Usar el template nativo de WooCommerce
+                        wc_get_template(
+                            'myaccount/payment-methods.php',
+                            array(
+                                'saved_methods' => $saved_methods,
+                                'has_methods'   => $has_methods,
+                            )
+                        );
+                    }
 
                     echo '</div>';
                 } else {
@@ -1006,13 +1023,30 @@ function wc_load_dynamic_form_ajax() {
                 break;
 
             case 'add-payment-method':
-                // Cargar formulario para añadir nuevo método de pago - usar template de WooCommerce
-                if (function_exists('wc_get_template')) {
-                    echo '<div class="woocommerce-MyAccount-addPaymentMethod">';
-                    echo '<p class="info-message">' . __('Completa la información a continuación para añadir un nuevo método de pago.', 'wc-license-display') . '</p>';
+                // Cargar formulario para añadir nuevo método de pago - verificar pasarelas de pago
+                if (function_exists('wc_get_template') && function_exists('WC')) {
+                    // Verificar si hay pasarelas de pago disponibles
+                    $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
+                    $supports_tokenization = false;
 
-                    // Usar el template nativo de WooCommerce
-                    wc_get_template('myaccount/form-add-payment-method.php');
+                    foreach ($available_gateways as $gateway) {
+                        if ($gateway->supports('tokenization')) {
+                            $supports_tokenization = true;
+                            break;
+                        }
+                    }
+
+                    echo '<div class="woocommerce-MyAccount-addPaymentMethod">';
+
+                    if (!$supports_tokenization) {
+                        echo '<p class="woocommerce-info">' . __('No hay pasarelas de pago configuradas que soporten métodos de pago guardados.', 'wc-license-display') . '</p>';
+                        echo '<p>' . __('Por favor, contacta al administrador del sitio para configurar métodos de pago como Stripe o PayPal.', 'wc-license-display') . '</p>';
+                    } else {
+                        echo '<p class="info-message">' . __('Completa la información a continuación para añadir un nuevo método de pago.', 'wc-license-display') . '</p>';
+
+                        // Usar el template nativo de WooCommerce
+                        wc_get_template('myaccount/form-add-payment-method.php');
+                    }
 
                     echo '</div>';
                 } else {
