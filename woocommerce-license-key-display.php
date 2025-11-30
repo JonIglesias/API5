@@ -978,92 +978,45 @@ function wc_load_dynamic_form_ajax() {
                 break;
 
             case 'payment-methods':
-                // Cargar el formulario de métodos de pago
-                if (function_exists('wc_get_account_payment_methods_columns')) {
-                    // Simular el contexto de WooCommerce My Account
+                // Cargar el formulario de métodos de pago - usar template de WooCommerce
+                if (function_exists('wc_get_template')) {
+                    // Simular estar en la página My Account
+                    global $wp;
+                    $wp->query_vars['payment-methods'] = '';
+
                     echo '<div class="woocommerce-MyAccount-paymentMethods">';
+                    echo '<p class="info-message">' . __('Aquí puedes gestionar tus métodos de pago guardados.', 'wc-license-display') . '</p>';
 
                     $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
+                    $has_methods = (bool) $saved_methods;
 
-                    if (!empty($saved_methods)) {
-                        echo '<table class="woocommerce-PaymentMethods shop_table shop_table_responsive account-payment-methods-table">';
-                        echo '<thead><tr>';
-                        foreach (wc_get_account_payment_methods_columns() as $column_id => $column_name) {
-                            echo '<th class="woocommerce-PaymentMethod woocommerce-PaymentMethod--' . esc_attr($column_id) . '">' . esc_html($column_name) . '</th>';
-                        }
-                        echo '</tr></thead><tbody>';
-
-                        foreach ($saved_methods as $type => $methods) {
-                            foreach ($methods as $method) {
-                                echo '<tr class="payment-method">';
-                                echo '<td class="woocommerce-PaymentMethod woocommerce-PaymentMethod--method" data-title="' . esc_attr__('Method', 'wc-license-display') . '">';
-                                echo esc_html($method['method']['brand'] ?? $type);
-                                echo '</td>';
-                                echo '<td class="woocommerce-PaymentMethod woocommerce-PaymentMethod--expires" data-title="' . esc_attr__('Expires', 'wc-license-display') . '">';
-                                echo esc_html($method['expires'] ?? '-');
-                                echo '</td>';
-                                echo '<td class="woocommerce-PaymentMethod woocommerce-PaymentMethod--actions">';
-                                foreach ($method['actions'] as $action_id => $action) {
-                                    echo '<a href="' . esc_url($action['url']) . '" class="button ' . esc_attr($action_id) . '">' . esc_html($action['name']) . '</a>';
-                                }
-                                echo '</td>';
-                                echo '</tr>';
-                            }
-                        }
-
-                        echo '</tbody></table>';
-                    } else {
-                        echo '<p>' . __('No tienes métodos de pago guardados.', 'wc-license-display') . '</p>';
-                    }
+                    // Usar el template nativo de WooCommerce
+                    wc_get_template(
+                        'myaccount/payment-methods.php',
+                        array(
+                            'saved_methods' => $saved_methods,
+                            'has_methods'   => $has_methods,
+                        )
+                    );
 
                     echo '</div>';
+                } else {
+                    echo '<p class="error-message">' . __('WooCommerce no está disponible.', 'wc-license-display') . '</p>';
                 }
                 break;
 
             case 'add-payment-method':
-                // Cargar formulario para añadir nuevo método de pago
-                if (function_exists('WC') && WC()->payment_gateways()) {
-                    // Obtener gateways que soportan tokenización
-                    $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+                // Cargar formulario para añadir nuevo método de pago - usar template de WooCommerce
+                if (function_exists('wc_get_template')) {
+                    echo '<div class="woocommerce-MyAccount-addPaymentMethod">';
+                    echo '<p class="info-message">' . __('Completa la información a continuación para añadir un nuevo método de pago.', 'wc-license-display') . '</p>';
 
-                    if ($available_gateways) {
-                        echo '<form id="add_payment_method" method="post">';
-                        echo '<div id="payment" class="woocommerce-Payment">';
+                    // Usar el template nativo de WooCommerce
+                    wc_get_template('myaccount/form-add-payment-method.php');
 
-                        $has_token_gateway = false;
-                        foreach ($available_gateways as $gateway) {
-                            if ($gateway->supports('tokenization')) {
-                                $has_token_gateway = true;
-                                break;
-                            }
-                        }
-
-                        if ($has_token_gateway) {
-                            echo '<ul class="woocommerce-PaymentMethods payment_methods methods">';
-
-                            foreach ($available_gateways as $gateway) {
-                                if ($gateway->supports('tokenization')) {
-                                    wc_get_template('checkout/payment-method.php', array(
-                                        'gateway' => $gateway,
-                                    ));
-                                }
-                            }
-
-                            echo '</ul>';
-                            echo '<div class="form-row">';
-                            wp_nonce_field('woocommerce-add-payment-method', 'woocommerce-add-payment-method-nonce');
-                            echo '<button type="submit" class="button" value="' . esc_attr__('Add payment method', 'wc-license-display') . '">' . esc_html__('Añadir método de pago', 'wc-license-display') . '</button>';
-                            echo '</div>';
-                        } else {
-                            echo '<p>' . __('No hay métodos de pago disponibles que soporten guardar tarjetas.', 'wc-license-display') . '</p>';
-                        }
-
-                        echo '</div></form>';
-                    } else {
-                        echo '<p>' . __('No hay métodos de pago disponibles.', 'wc-license-display') . '</p>';
-                    }
+                    echo '</div>';
                 } else {
-                    echo '<p>' . __('Error: WooCommerce payment gateways not available.', 'wc-license-display') . '</p>';
+                    echo '<p class="error-message">' . __('WooCommerce no está disponible.', 'wc-license-display') . '</p>';
                 }
                 break;
 
