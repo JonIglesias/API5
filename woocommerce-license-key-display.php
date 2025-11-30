@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.1
+ * Version: 2.0.2
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -568,7 +568,12 @@ function wc_shortcode_orders_with_subscriptions($atts) {
                             <div class="subscription-header">
                                 <h4>📋 <?php _e('Suscripción #', 'wc-license-display'); ?><?php echo esc_html($subscription->get_order_number()); ?></h4>
                                 <span class="subscription-status status-<?php echo esc_attr($subscription->get_status()); ?>">
-                                    <?php echo esc_html(wcs_get_subscription_status_name($subscription->get_status())); ?>
+                                    <?php
+                                    $status_name = function_exists('wcs_get_subscription_status_name')
+                                        ? wcs_get_subscription_status_name($subscription->get_status())
+                                        : ucfirst($subscription->get_status());
+                                    echo esc_html($status_name);
+                                    ?>
                                 </span>
                             </div>
 
