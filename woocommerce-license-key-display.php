@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.2
+ * Version: 2.0.3
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -581,20 +581,39 @@ function wc_shortcode_orders_with_subscriptions($atts) {
                                 <div class="subscription-info-grid">
                                     <div class="info-item">
                                         <span class="label"><?php _e('Fecha de inicio:', 'wc-license-display'); ?></span>
-                                        <span class="value"><?php echo esc_html($subscription->get_date('start') ? $subscription->get_date_to_display('start') : '-'); ?></span>
+                                        <span class="value">
+                                            <?php
+                                            $start_date = '';
+                                            if (method_exists($subscription, 'get_time')) {
+                                                $start_timestamp = $subscription->get_time('start');
+                                                if ($start_timestamp) {
+                                                    $start_date = date_i18n('d/m/Y', $start_timestamp);
+                                                }
+                                            } elseif (method_exists($subscription, 'get_date_created')) {
+                                                $start_date = $subscription->get_date_created()->date_i18n('d/m/Y');
+                                            }
+                                            echo esc_html($start_date ?: '-');
+                                            ?>
+                                        </span>
                                     </div>
 
-                                    <?php if ($subscription->get_date('next_payment')) : ?>
+                                    <?php
+                                    $next_payment_timestamp = method_exists($subscription, 'get_time') ? $subscription->get_time('next_payment') : 0;
+                                    if ($next_payment_timestamp) :
+                                    ?>
                                     <div class="info-item">
                                         <span class="label"><?php _e('Próximo pago:', 'wc-license-display'); ?></span>
-                                        <span class="value next-payment"><?php echo esc_html($subscription->get_date_to_display('next_payment')); ?></span>
+                                        <span class="value next-payment"><?php echo esc_html(date_i18n('d/m/Y', $next_payment_timestamp)); ?></span>
                                     </div>
                                     <?php endif; ?>
 
-                                    <?php if ($subscription->get_date('end')) : ?>
+                                    <?php
+                                    $end_timestamp = method_exists($subscription, 'get_time') ? $subscription->get_time('end') : 0;
+                                    if ($end_timestamp) :
+                                    ?>
                                     <div class="info-item">
                                         <span class="label"><?php _e('Fecha de finalización:', 'wc-license-display'); ?></span>
-                                        <span class="value"><?php echo esc_html($subscription->get_date_to_display('end')); ?></span>
+                                        <span class="value"><?php echo esc_html(date_i18n('d/m/Y', $end_timestamp)); ?></span>
                                     </div>
                                     <?php endif; ?>
 
