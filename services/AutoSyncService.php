@@ -126,26 +126,61 @@ class AutoSyncService {
             // Obtener mapa de productos a planes
             $planMap = $this->getPlanMap();
 
+            Logger::sync('info', 'Plan map loaded', [
+                'total_plans' => count($planMap),
+                'product_ids' => array_keys($planMap)
+            ]);
+
             if (empty($planMap)) {
                 $results['errors']++;
                 $results['details'][] = 'No plans configured with WooCommerce product IDs';
+                Logger::sync('error', 'No plans configured with WooCommerce product IDs - auto-sync aborted');
                 return $results;
             }
 
             $page = 1;
             $hasMore = true;
+            $totalOrdersFetched = 0;
 
             while ($hasMore) {
+                Logger::sync('info', "Fetching orders from WooCommerce", [
+                    'page' => $page,
+                    'since' => $since
+                ]);
+
                 $orders = $this->wc->getOrdersModifiedAfter($since, $page, 100);
+
+                Logger::sync('info', "Orders fetched from WooCommerce", [
+                    'page' => $page,
+                    'count' => count($orders)
+                ]);
 
                 if (empty($orders)) {
                     $hasMore = false;
                     break;
                 }
 
+                $totalOrdersFetched += count($orders);
+
                 foreach ($orders as $order) {
+                    $orderId = $order['id'];
+                    $orderStatus = $order['status'];
+                    $orderProducts = array_column($order['line_items'] ?? [], 'product_id');
+
+                    Logger::sync('info', "Processing order from WooCommerce", [
+                        'order_id' => $orderId,
+                        'status' => $orderStatus,
+                        'product_ids' => $orderProducts
+                    ]);
+
                     $result = $this->processOrder($order, $planMap);
                     $results[$result['action']]++;
+
+                    Logger::sync('info', "Order processed", [
+                        'order_id' => $orderId,
+                        'action' => $result['action'],
+                        'message' => $result['message'] ?? ''
+                    ]);
 
                     if ($result['action'] === 'error') {
                         $results['details'][] = $result['message'];
@@ -159,7 +194,9 @@ class AutoSyncService {
                 }
             }
 
-            Logger::sync('info', 'Recent auto-sync completed', $results);
+            Logger::sync('info', 'Recent auto-sync completed', array_merge($results, [
+                'total_orders_fetched' => $totalOrdersFetched
+            ]));
 
             // Sincronizar license_keys pendientes a WooCommerce
             $this->syncPendingLicenseKeys($results);
