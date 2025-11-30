@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.0
+ * Version: 2.0.2
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -255,41 +255,50 @@ add_action('manage_woocommerce_page_wc-orders_custom_column', 'wc_license_displa
  * Muestra los datos de la cuenta del cliente (nombre, email, etc.)
  */
 function wc_shortcode_account_details($atts) {
+    // Verificar que WooCommerce esté activo
+    if (!function_exists('WC') || !class_exists('WC_Customer')) {
+        return '<p style="color: red;">Error: WooCommerce no está activo.</p>';
+    }
+
     if (!is_user_logged_in()) {
         return '<p>' . __('Debes iniciar sesión para ver esta información.', 'wc-license-display') . '</p>';
     }
 
-    $user = wp_get_current_user();
-    $customer = new WC_Customer($user->ID);
+    try {
+        $user = wp_get_current_user();
+        $customer = new WC_Customer($user->ID);
 
-    ob_start();
-    ?>
-    <div class="wc-account-details-shortcode">
-        <h2><?php _e('Mis Datos', 'wc-license-display'); ?></h2>
-        <div class="account-info-grid">
-            <div class="info-item">
-                <span class="label"><?php _e('Nombre:', 'wc-license-display'); ?></span>
-                <span class="value"><?php echo esc_html($customer->get_first_name()); ?></span>
+        ob_start();
+        ?>
+        <div class="wc-account-details-shortcode">
+            <h2><?php _e('Mis Datos', 'wc-license-display'); ?></h2>
+            <div class="account-info-grid">
+                <div class="info-item">
+                    <span class="label"><?php _e('Nombre:', 'wc-license-display'); ?></span>
+                    <span class="value"><?php echo esc_html($customer->get_first_name()); ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="label"><?php _e('Apellidos:', 'wc-license-display'); ?></span>
+                    <span class="value"><?php echo esc_html($customer->get_last_name()); ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="label"><?php _e('Email:', 'wc-license-display'); ?></span>
+                    <span class="value"><?php echo esc_html($customer->get_email()); ?></span>
+                </div>
+                <div class="info-item">
+                    <span class="label"><?php _e('Nombre de usuario:', 'wc-license-display'); ?></span>
+                    <span class="value"><?php echo esc_html($user->user_login); ?></span>
+                </div>
             </div>
-            <div class="info-item">
-                <span class="label"><?php _e('Apellidos:', 'wc-license-display'); ?></span>
-                <span class="value"><?php echo esc_html($customer->get_last_name()); ?></span>
-            </div>
-            <div class="info-item">
-                <span class="label"><?php _e('Email:', 'wc-license-display'); ?></span>
-                <span class="value"><?php echo esc_html($customer->get_email()); ?></span>
-            </div>
-            <div class="info-item">
-                <span class="label"><?php _e('Nombre de usuario:', 'wc-license-display'); ?></span>
-                <span class="value"><?php echo esc_html($user->user_login); ?></span>
-            </div>
+            <a href="<?php echo esc_url(wc_get_endpoint_url('edit-account', '', wc_get_page_permalink('myaccount'))); ?>" class="button">
+                <?php _e('Editar mis datos', 'wc-license-display'); ?>
+            </a>
         </div>
-        <a href="<?php echo esc_url(wc_get_endpoint_url('edit-account', '', wc_get_page_permalink('myaccount'))); ?>" class="button">
-            <?php _e('Editar mis datos', 'wc-license-display'); ?>
-        </a>
-    </div>
-    <?php
-    return ob_get_clean();
+        <?php
+        return ob_get_clean();
+    } catch (Exception $e) {
+        return '<p style="color: red;">Error al cargar datos de cuenta: ' . esc_html($e->getMessage()) . '</p>';
+    }
 }
 add_shortcode('wc_account_details', 'wc_shortcode_account_details');
 
@@ -299,11 +308,17 @@ add_shortcode('wc_account_details', 'wc_shortcode_account_details');
  * Muestra las direcciones de facturación y envío
  */
 function wc_shortcode_addresses($atts) {
+    // Verificar que WooCommerce esté activo
+    if (!function_exists('WC') || !class_exists('WC_Customer')) {
+        return '<p style="color: red;">Error: WooCommerce no está activo.</p>';
+    }
+
     if (!is_user_logged_in()) {
         return '<p>' . __('Debes iniciar sesión para ver esta información.', 'wc-license-display') . '</p>';
     }
 
-    $customer = new WC_Customer(get_current_user_id());
+    try {
+        $customer = new WC_Customer(get_current_user_id());
 
     ob_start();
     ?>
@@ -381,7 +396,10 @@ function wc_shortcode_addresses($atts) {
         </div>
     </div>
     <?php
-    return ob_get_clean();
+        return ob_get_clean();
+    } catch (Exception $e) {
+        return '<p style="color: red;">Error al cargar direcciones: ' . esc_html($e->getMessage()) . '</p>';
+    }
 }
 add_shortcode('wc_addresses', 'wc_shortcode_addresses');
 
@@ -391,16 +409,22 @@ add_shortcode('wc_addresses', 'wc_shortcode_addresses');
  * Muestra los métodos de pago guardados
  */
 function wc_shortcode_payment_methods($atts) {
+    // Verificar que WooCommerce esté activo
+    if (!function_exists('WC') || !function_exists('wc_get_customer_saved_methods_list')) {
+        return '<p style="color: red;">Error: WooCommerce no está activo.</p>';
+    }
+
     if (!is_user_logged_in()) {
         return '<p>' . __('Debes iniciar sesión para ver esta información.', 'wc-license-display') . '</p>';
     }
 
-    ob_start();
-    ?>
-    <div class="wc-payment-methods-shortcode">
-        <h2><?php _e('Mis Métodos de Pago', 'wc-license-display'); ?></h2>
-        <?php
-        $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
+    try {
+        ob_start();
+        ?>
+        <div class="wc-payment-methods-shortcode">
+            <h2><?php _e('Mis Métodos de Pago', 'wc-license-display'); ?></h2>
+            <?php
+            $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
 
         if (!empty($saved_methods)) {
             foreach ($saved_methods as $type => $methods) {
@@ -426,7 +450,10 @@ function wc_shortcode_payment_methods($atts) {
         </a>
     </div>
     <?php
-    return ob_get_clean();
+        return ob_get_clean();
+    } catch (Exception $e) {
+        return '<p style="color: red;">Error al cargar métodos de pago: ' . esc_html($e->getMessage()) . '</p>';
+    }
 }
 add_shortcode('wc_payment_methods', 'wc_shortcode_payment_methods');
 
@@ -440,28 +467,34 @@ add_shortcode('wc_payment_methods', 'wc_shortcode_payment_methods');
  * - status: estado de los pedidos (default: any)
  */
 function wc_shortcode_orders_with_subscriptions($atts) {
+    // Verificar que WooCommerce esté activo
+    if (!function_exists('WC') || !function_exists('wc_get_orders')) {
+        return '<p style="color: red;">Error: WooCommerce no está activo.</p>';
+    }
+
     if (!is_user_logged_in()) {
         return '<p>' . __('Debes iniciar sesión para ver tus pedidos.', 'wc-license-display') . '</p>';
     }
 
-    $atts = shortcode_atts(array(
-        'limit' => 10,
-        'status' => 'any'
-    ), $atts);
+    try {
+        $atts = shortcode_atts(array(
+            'limit' => 10,
+            'status' => 'any'
+        ), $atts);
 
-    $customer_orders = wc_get_orders(array(
-        'customer' => get_current_user_id(),
-        'limit' => $atts['limit'],
-        'status' => $atts['status'],
-        'orderby' => 'date',
-        'order' => 'DESC',
-    ));
+        $customer_orders = wc_get_orders(array(
+            'customer' => get_current_user_id(),
+            'limit' => $atts['limit'],
+            'status' => $atts['status'],
+            'orderby' => 'date',
+            'order' => 'DESC',
+        ));
 
-    if (empty($customer_orders)) {
-        return '<p>' . __('No tienes pedidos todavía.', 'wc-license-display') . '</p>';
-    }
+        if (empty($customer_orders)) {
+            return '<p>' . __('No tienes pedidos todavía.', 'wc-license-display') . '</p>';
+        }
 
-    ob_start();
+        ob_start();
     ?>
     <div class="wc-orders-subscriptions-shortcode">
         <h2><?php _e('Mis Pedidos y Suscripciones', 'wc-license-display'); ?></h2>
@@ -535,7 +568,12 @@ function wc_shortcode_orders_with_subscriptions($atts) {
                             <div class="subscription-header">
                                 <h4>📋 <?php _e('Suscripción #', 'wc-license-display'); ?><?php echo esc_html($subscription->get_order_number()); ?></h4>
                                 <span class="subscription-status status-<?php echo esc_attr($subscription->get_status()); ?>">
-                                    <?php echo esc_html(wcs_get_subscription_status_name($subscription->get_status())); ?>
+                                    <?php
+                                    $status_name = function_exists('wcs_get_subscription_status_name')
+                                        ? wcs_get_subscription_status_name($subscription->get_status())
+                                        : ucfirst($subscription->get_status());
+                                    echo esc_html($status_name);
+                                    ?>
                                 </span>
                             </div>
 
@@ -608,7 +646,10 @@ function wc_shortcode_orders_with_subscriptions($atts) {
     }
     </script>
     <?php
-    return ob_get_clean();
+        return ob_get_clean();
+    } catch (Exception $e) {
+        return '<p style="color: red;">Error al cargar pedidos: ' . esc_html($e->getMessage()) . '</p>';
+    }
 }
 add_shortcode('wc_orders_with_subscriptions', 'wc_shortcode_orders_with_subscriptions');
 
