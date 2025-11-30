@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.8
+ * Version: 2.0.9
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -984,18 +984,25 @@ function wc_load_dynamic_form_ajax() {
                     $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
                     $supports_tokenization = false;
 
+                    // DEBUG: Log available gateways
+                    error_log('DEBUG payment-methods: Available gateways count: ' . count($available_gateways));
+
                     foreach ($available_gateways as $gateway) {
+                        error_log('DEBUG payment-methods: Checking gateway: ' . $gateway->id);
                         if ($gateway->supports('tokenization')) {
                             $supports_tokenization = true;
+                            error_log('DEBUG payment-methods: Gateway ' . $gateway->id . ' supports tokenization');
                             break;
                         }
                     }
 
-                    echo '<div class="woocommerce-MyAccount-paymentMethods">';
+                    error_log('DEBUG payment-methods: Supports tokenization: ' . ($supports_tokenization ? 'YES' : 'NO'));
+
+                    echo '<div class="woocommerce-MyAccount-paymentMethods" style="background: #e3f2fd; padding: 20px; border: 2px solid #2196F3; border-radius: 5px; margin: 10px 0;">';
 
                     if (!$supports_tokenization) {
-                        echo '<p class="woocommerce-info">' . __('No hay pasarelas de pago configuradas que soporten métodos de pago guardados.', 'wc-license-display') . '</p>';
-                        echo '<p>' . __('Por favor, contacta al administrador del sitio para configurar métodos de pago.', 'wc-license-display') . '</p>';
+                        echo '<p class="woocommerce-info" style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 10px 0;">' . __('No hay pasarelas de pago configuradas que soporten métodos de pago guardados.', 'wc-license-display') . '</p>';
+                        echo '<p style="padding: 10px; background: white; margin: 10px 0;">' . __('Por favor, contacta al administrador del sitio para configurar métodos de pago.', 'wc-license-display') . '</p>';
                     } else {
                         echo '<p class="info-message">' . __('Aquí puedes gestionar tus métodos de pago guardados.', 'wc-license-display') . '</p>';
 
@@ -1017,8 +1024,10 @@ function wc_load_dynamic_form_ajax() {
                     }
 
                     echo '</div>';
+                    error_log('DEBUG payment-methods: HTML generation completed');
                 } else {
                     echo '<p class="error-message">' . __('WooCommerce no está disponible.', 'wc-license-display') . '</p>';
+                    error_log('DEBUG payment-methods: WooCommerce not available');
                 }
                 break;
 
@@ -1029,18 +1038,25 @@ function wc_load_dynamic_form_ajax() {
                     $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
                     $supports_tokenization = false;
 
+                    // DEBUG: Log available gateways
+                    error_log('DEBUG add-payment-method: Available gateways count: ' . count($available_gateways));
+
                     foreach ($available_gateways as $gateway) {
+                        error_log('DEBUG add-payment-method: Checking gateway: ' . $gateway->id);
                         if ($gateway->supports('tokenization')) {
                             $supports_tokenization = true;
+                            error_log('DEBUG add-payment-method: Gateway ' . $gateway->id . ' supports tokenization');
                             break;
                         }
                     }
 
-                    echo '<div class="woocommerce-MyAccount-addPaymentMethod">';
+                    error_log('DEBUG add-payment-method: Supports tokenization: ' . ($supports_tokenization ? 'YES' : 'NO'));
+
+                    echo '<div class="woocommerce-MyAccount-addPaymentMethod" style="background: #e3f2fd; padding: 20px; border: 2px solid #2196F3; border-radius: 5px; margin: 10px 0;">';
 
                     if (!$supports_tokenization) {
-                        echo '<p class="woocommerce-info">' . __('No hay pasarelas de pago configuradas que soporten métodos de pago guardados.', 'wc-license-display') . '</p>';
-                        echo '<p>' . __('Por favor, contacta al administrador del sitio para configurar métodos de pago como Stripe o PayPal.', 'wc-license-display') . '</p>';
+                        echo '<p class="woocommerce-info" style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 10px 0;">' . __('No hay pasarelas de pago configuradas que soporten métodos de pago guardados.', 'wc-license-display') . '</p>';
+                        echo '<p style="padding: 10px; background: white; margin: 10px 0;">' . __('Por favor, contacta al administrador del sitio para configurar métodos de pago como Stripe o PayPal.', 'wc-license-display') . '</p>';
                     } else {
                         echo '<p class="info-message">' . __('Completa la información a continuación para añadir un nuevo método de pago.', 'wc-license-display') . '</p>';
 
@@ -1049,8 +1065,10 @@ function wc_load_dynamic_form_ajax() {
                     }
 
                     echo '</div>';
+                    error_log('DEBUG add-payment-method: HTML generation completed');
                 } else {
                     echo '<p class="error-message">' . __('WooCommerce no está disponible.', 'wc-license-display') . '</p>';
+                    error_log('DEBUG add-payment-method: WooCommerce not available');
                 }
                 break;
 
@@ -1136,9 +1154,16 @@ function wc_load_dynamic_form_ajax() {
 
         $html = ob_get_clean();
 
+        // DEBUG: Log the HTML length and first 200 characters
+        error_log('DEBUG AJAX Response: HTML length: ' . strlen($html));
+        error_log('DEBUG AJAX Response: HTML preview: ' . substr($html, 0, 200));
+        error_log('DEBUG AJAX Response: HTML is empty: ' . (empty($html) ? 'YES' : 'NO'));
+
         if (empty($html)) {
+            error_log('DEBUG AJAX Response: Sending error - HTML is empty');
             wp_send_json_error(array('message' => __('No se pudo cargar el formulario.', 'wc-license-display')));
         } else {
+            error_log('DEBUG AJAX Response: Sending success with HTML');
             wp_send_json_success(array('html' => $html));
         }
 
@@ -1205,10 +1230,24 @@ function wc_shortcodes_enqueue_scripts() {
                     type: 'POST',
                     data: ajaxData,
                     success: function(response) {
+                        console.log('DEBUG AJAX Success - Full response:', response);
+                        console.log('DEBUG AJAX Success - response.success:', response.success);
+                        console.log('DEBUG AJAX Success - response.data:', response.data);
+
                         if (response.success) {
+                            console.log('DEBUG AJAX Success - HTML length:', response.data.html ? response.data.html.length : 0);
+                            console.log('DEBUG AJAX Success - HTML preview:', response.data.html ? response.data.html.substring(0, 200) : 'NULL');
+                            console.log('DEBUG AJAX Success - Container found:', container.length);
+                            console.log('DEBUG AJAX Success - Container selector:', container.selector || 'N/A');
+
                             container.html(response.data.html);
+                            console.log('DEBUG AJAX Success - HTML inserted into container');
+
                             container.slideDown(300);
+                            console.log('DEBUG AJAX Success - Container slideDown called');
+
                             button.text('<?php echo esc_js(__('Ocultar', 'wc-license-display')); ?>');
+                            console.log('DEBUG AJAX Success - Button text changed to Ocultar');
 
                             // Inicializar select2 si está disponible
                             if (typeof $.fn.selectWoo !== 'undefined') {
@@ -1218,11 +1257,16 @@ function wc_shortcodes_enqueue_scripts() {
                             // Trigger de WooCommerce para scripts adicionales
                             $(document.body).trigger('country_to_state_changed');
                         } else {
+                            console.log('DEBUG AJAX Error - response.success is false');
+                            console.log('DEBUG AJAX Error - Error message:', response.data.message);
                             alert(response.data.message || '<?php echo esc_js(__('Error al cargar el formulario.', 'wc-license-display')); ?>');
                             button.text(button.data('original-text'));
                         }
                     },
-                    error: function() {
+                    error: function(xhr, status, error) {
+                        console.log('DEBUG AJAX Failure - XHR:', xhr);
+                        console.log('DEBUG AJAX Failure - Status:', status);
+                        console.log('DEBUG AJAX Failure - Error:', error);
                         alert('<?php echo esc_js(__('Error de conexión.', 'wc-license-display')); ?>');
                         button.text(button.data('original-text'));
                     }
