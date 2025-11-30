@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce License Key Display & Custom My Account
  * Plugin URI: https://github.com/JonIglesias/API5
  * Description: Muestra la clave de licencia generada por la API en los pedidos de WooCommerce, en los emails, y proporciona shortcodes para crear páginas Mi Cuenta personalizadas
- * Version: 2.0.5
+ * Version: 2.0.6
  * Author: Jon Iglesias
  * Author URI: https://github.com/JonIglesias
  * Text Domain: wc-license-display
@@ -859,10 +859,15 @@ function wc_shortcode_orders_with_subscriptions($atts) {
                                         </a>
                                     <?php endif; ?>
 
-                                    <a href="<?php echo esc_url($subscription->get_view_order_url()); ?>" class="button view-subscription">
+                                    <button type="button" class="button view-subscription wc-load-form-btn"
+                                            data-form="view-subscription"
+                                            data-subscription-id="<?php echo esc_attr($subscription->get_id()); ?>">
                                         <?php _e('Ver detalles', 'wc-license-display'); ?>
-                                    </a>
+                                    </button>
                                 </div>
+                                <div class="wc-dynamic-form-container subscription-details-container"
+                                     id="subscription-details-<?php echo esc_attr($subscription->get_id()); ?>"
+                                     style="display: none;"></div>
                             </div>
                         </div>
                 <?php
@@ -974,24 +979,166 @@ function wc_load_dynamic_form_ajax() {
 
             case 'payment-methods':
                 // Cargar el formulario de métodos de pago
-                if (function_exists('wc_get_template')) {
-                    // Obtener métodos de pago guardados
+                if (function_exists('wc_get_account_payment_methods_columns')) {
+                    // Simular el contexto de WooCommerce My Account
+                    echo '<div class="woocommerce-MyAccount-paymentMethods">';
+
                     $saved_methods = wc_get_customer_saved_methods_list(get_current_user_id());
 
-                    // Obtener gateways de pago que soportan tokenización
-                    $has_methods = (bool) $saved_methods;
+                    if (!empty($saved_methods)) {
+                        echo '<table class="woocommerce-PaymentMethods shop_table shop_table_responsive account-payment-methods-table">';
+                        echo '<thead><tr>';
+                        foreach (wc_get_account_payment_methods_columns() as $column_id => $column_name) {
+                            echo '<th class="woocommerce-PaymentMethod woocommerce-PaymentMethod--' . esc_attr($column_id) . '">' . esc_html($column_name) . '</th>';
+                        }
+                        echo '</tr></thead><tbody>';
 
-                    wc_get_template('myaccount/payment-methods.php', array(
-                        'saved_methods' => $saved_methods,
-                        'has_methods' => $has_methods
-                    ));
+                        foreach ($saved_methods as $type => $methods) {
+                            foreach ($methods as $method) {
+                                echo '<tr class="payment-method">';
+                                echo '<td class="woocommerce-PaymentMethod woocommerce-PaymentMethod--method" data-title="' . esc_attr__('Method', 'wc-license-display') . '">';
+                                echo esc_html($method['method']['brand'] ?? $type);
+                                echo '</td>';
+                                echo '<td class="woocommerce-PaymentMethod woocommerce-PaymentMethod--expires" data-title="' . esc_attr__('Expires', 'wc-license-display') . '">';
+                                echo esc_html($method['expires'] ?? '-');
+                                echo '</td>';
+                                echo '<td class="woocommerce-PaymentMethod woocommerce-PaymentMethod--actions">';
+                                foreach ($method['actions'] as $action_id => $action) {
+                                    echo '<a href="' . esc_url($action['url']) . '" class="button ' . esc_attr($action_id) . '">' . esc_html($action['name']) . '</a>';
+                                }
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                        }
+
+                        echo '</tbody></table>';
+                    } else {
+                        echo '<p>' . __('No tienes métodos de pago guardados.', 'wc-license-display') . '</p>';
+                    }
+
+                    echo '</div>';
                 }
                 break;
 
             case 'add-payment-method':
                 // Cargar formulario para añadir nuevo método de pago
-                if (function_exists('wc_get_template')) {
-                    wc_get_template('myaccount/form-add-payment-method.php');
+                if (function_exists('WC') && WC()->payment_gateways()) {
+                    // Obtener gateways que soportan tokenización
+                    $available_gateways = WC()->payment_gateways()->get_available_payment_gateways();
+
+                    if ($available_gateways) {
+                        echo '<form id="add_payment_method" method="post">';
+                        echo '<div id="payment" class="woocommerce-Payment">';
+
+                        $has_token_gateway = false;
+                        foreach ($available_gateways as $gateway) {
+                            if ($gateway->supports('tokenization')) {
+                                $has_token_gateway = true;
+                                break;
+                            }
+                        }
+
+                        if ($has_token_gateway) {
+                            echo '<ul class="woocommerce-PaymentMethods payment_methods methods">';
+
+                            foreach ($available_gateways as $gateway) {
+                                if ($gateway->supports('tokenization')) {
+                                    wc_get_template('checkout/payment-method.php', array(
+                                        'gateway' => $gateway,
+                                    ));
+                                }
+                            }
+
+                            echo '</ul>';
+                            echo '<div class="form-row">';
+                            wp_nonce_field('woocommerce-add-payment-method', 'woocommerce-add-payment-method-nonce');
+                            echo '<button type="submit" class="button" value="' . esc_attr__('Add payment method', 'wc-license-display') . '">' . esc_html__('Añadir método de pago', 'wc-license-display') . '</button>';
+                            echo '</div>';
+                        } else {
+                            echo '<p>' . __('No hay métodos de pago disponibles que soporten guardar tarjetas.', 'wc-license-display') . '</p>';
+                        }
+
+                        echo '</div></form>';
+                    } else {
+                        echo '<p>' . __('No hay métodos de pago disponibles.', 'wc-license-display') . '</p>';
+                    }
+                } else {
+                    echo '<p>' . __('Error: WooCommerce payment gateways not available.', 'wc-license-display') . '</p>';
+                }
+                break;
+
+            case 'view-subscription':
+                // Ver detalles de suscripción inline
+                if (function_exists('wcs_get_subscription') && isset($_POST['subscription_id'])) {
+                    $subscription_id = intval($_POST['subscription_id']);
+                    $subscription = wcs_get_subscription($subscription_id);
+
+                    if ($subscription && $subscription->get_user_id() == get_current_user_id()) {
+                        echo '<div class="subscription-details-view">';
+                        echo '<h3>' . sprintf(__('Suscripción #%s', 'wc-license-display'), $subscription->get_order_number()) . '</h3>';
+
+                        // Estado
+                        echo '<p><strong>' . __('Estado:', 'wc-license-display') . '</strong> ';
+                        $status_name = function_exists('wcs_get_subscription_status_name')
+                            ? wcs_get_subscription_status_name($subscription->get_status())
+                            : ucfirst($subscription->get_status());
+                        echo esc_html($status_name) . '</p>';
+
+                        // Fechas importantes
+                        echo '<h4>' . __('Fechas', 'wc-license-display') . '</h4>';
+                        echo '<table class="subscription-dates-table">';
+
+                        if (method_exists($subscription, 'get_time')) {
+                            $start_timestamp = $subscription->get_time('start');
+                            if ($start_timestamp) {
+                                echo '<tr><td><strong>' . __('Inicio:', 'wc-license-display') . '</strong></td>';
+                                echo '<td>' . esc_html(date_i18n('d/m/Y H:i', $start_timestamp)) . '</td></tr>';
+                            }
+
+                            $next_payment = $subscription->get_time('next_payment');
+                            if ($next_payment) {
+                                echo '<tr><td><strong>' . __('Próximo pago:', 'wc-license-display') . '</strong></td>';
+                                echo '<td>' . esc_html(date_i18n('d/m/Y H:i', $next_payment)) . '</td></tr>';
+                            }
+
+                            $end_timestamp = $subscription->get_time('end');
+                            if ($end_timestamp) {
+                                echo '<tr><td><strong>' . __('Fin:', 'wc-license-display') . '</strong></td>';
+                                echo '<td>' . esc_html(date_i18n('d/m/Y H:i', $end_timestamp)) . '</td></tr>';
+                            }
+                        }
+
+                        echo '</table>';
+
+                        // Productos
+                        echo '<h4>' . __('Productos', 'wc-license-display') . '</h4>';
+                        echo '<table class="subscription-items-table">';
+                        foreach ($subscription->get_items() as $item) {
+                            echo '<tr>';
+                            echo '<td>' . esc_html($item->get_name()) . '</td>';
+                            echo '<td>x' . esc_html($item->get_quantity()) . '</td>';
+                            echo '<td>' . $subscription->get_formatted_line_subtotal($item) . '</td>';
+                            echo '</tr>';
+                        }
+                        echo '</table>';
+
+                        // Total
+                        echo '<p class="subscription-total"><strong>' . __('Total:', 'wc-license-display') . '</strong> ';
+                        echo $subscription->get_formatted_order_total() . '</p>';
+
+                        // Acciones
+                        echo '<div class="subscription-actions-inline">';
+                        if ($subscription->can_be_updated_to('cancelled')) {
+                            echo '<a href="' . esc_url($subscription->get_cancel_endpoint()) . '" class="button button-cancel">' . __('Cancelar suscripción', 'wc-license-display') . '</a>';
+                        }
+                        echo '</div>';
+
+                        echo '</div>';
+                    } else {
+                        echo '<p>' . __('Suscripción no encontrada o no tienes permiso para verla.', 'wc-license-display') . '</p>';
+                    }
+                } else {
+                    echo '<p>' . __('ID de suscripción no especificado.', 'wc-license-display') . '</p>';
                 }
                 break;
 
@@ -1032,6 +1179,12 @@ function wc_shortcodes_enqueue_scripts() {
                 var formType = button.data('form');
                 var container = button.siblings('.wc-dynamic-form-container').first();
 
+                // Para suscripciones, buscar el contenedor específico
+                if (formType === 'view-subscription') {
+                    var subscriptionId = button.data('subscription-id');
+                    container = $('#subscription-details-' + subscriptionId);
+                }
+
                 // Si ya está visible, ocultarlo
                 if (container.is(':visible')) {
                     container.slideUp(300);
@@ -1047,15 +1200,23 @@ function wc_shortcodes_enqueue_scripts() {
                 // Cambiar texto del botón
                 button.text('<?php echo esc_js(__('Cargando...', 'wc-license-display')); ?>');
 
+                // Preparar datos para AJAX
+                var ajaxData = {
+                    action: 'wc_load_dynamic_form',
+                    form_type: formType,
+                    nonce: '<?php echo wp_create_nonce('wc_load_form'); ?>'
+                };
+
+                // Añadir subscription_id si es necesario
+                if (formType === 'view-subscription') {
+                    ajaxData.subscription_id = button.data('subscription-id');
+                }
+
                 // Petición AJAX
                 $.ajax({
                     url: '<?php echo admin_url('admin-ajax.php'); ?>',
                     type: 'POST',
-                    data: {
-                        action: 'wc_load_dynamic_form',
-                        form_type: formType,
-                        nonce: '<?php echo wp_create_nonce('wc_load_form'); ?>'
-                    },
+                    data: ajaxData,
                     success: function(response) {
                         if (response.success) {
                             container.html(response.data.html);
@@ -1692,6 +1853,149 @@ function wc_shortcodes_enqueue_styles() {
 
             .download-action .download-button {
                 width: 100%;
+            }
+        }
+
+        /* Payment Methods Tables */
+        .woocommerce-MyAccount-paymentMethods table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .woocommerce-MyAccount-paymentMethods th,
+        .woocommerce-MyAccount-paymentMethods td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .woocommerce-MyAccount-paymentMethods th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .woocommerce-MyAccount-paymentMethods td.woocommerce-PaymentMethod--actions {
+            text-align: right;
+        }
+
+        .woocommerce-MyAccount-paymentMethods .button {
+            padding: 6px 12px;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+
+        /* Add Payment Method Form */
+        #add_payment_method .payment_methods {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        #add_payment_method .payment_methods li {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        #add_payment_method .payment_methods li.wc-saved-payment-method {
+            background: #f9f9f9;
+        }
+
+        #add_payment_method .payment_methods label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        /* Subscription Details View */
+        .subscription-details-view {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .subscription-details-view h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .subscription-details-view h4 {
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .subscription-dates-table,
+        .subscription-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .subscription-dates-table td,
+        .subscription-items-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .subscription-dates-table td:first-child {
+            width: 40%;
+        }
+
+        .subscription-total {
+            font-size: 18px;
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            text-align: right;
+        }
+
+        .subscription-actions-inline {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .subscription-actions-inline .button-cancel {
+            background: #dc3545;
+        }
+
+        .subscription-actions-inline .button-cancel:hover {
+            background: #c82333;
+        }
+
+        @media (max-width: 768px) {
+            .woocommerce-MyAccount-paymentMethods table {
+                font-size: 14px;
+            }
+
+            .woocommerce-MyAccount-paymentMethods th {
+                display: none;
+            }
+
+            .woocommerce-MyAccount-paymentMethods td {
+                display: block;
+                text-align: right;
+                padding: 8px;
+                border: none;
+            }
+
+            .woocommerce-MyAccount-paymentMethods td::before {
+                content: attr(data-title);
+                float: left;
+                font-weight: 600;
+            }
+
+            .woocommerce-MyAccount-paymentMethods td.woocommerce-PaymentMethod--actions {
+                text-align: left;
             }
         }
         </style>
