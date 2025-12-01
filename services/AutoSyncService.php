@@ -126,26 +126,61 @@ class AutoSyncService {
             // Obtener mapa de productos a planes
             $planMap = $this->getPlanMap();
 
+            Logger::sync('info', 'Plan map loaded', [
+                'total_plans' => count($planMap),
+                'product_ids' => array_keys($planMap)
+            ]);
+
             if (empty($planMap)) {
                 $results['errors']++;
                 $results['details'][] = 'No plans configured with WooCommerce product IDs';
+                Logger::sync('error', 'No plans configured with WooCommerce product IDs - auto-sync aborted');
                 return $results;
             }
 
             $page = 1;
             $hasMore = true;
+            $totalOrdersFetched = 0;
 
             while ($hasMore) {
+                Logger::sync('info', "Fetching orders from WooCommerce", [
+                    'page' => $page,
+                    'since' => $since
+                ]);
+
                 $orders = $this->wc->getOrdersModifiedAfter($since, $page, 100);
+
+                Logger::sync('info', "Orders fetched from WooCommerce", [
+                    'page' => $page,
+                    'count' => count($orders)
+                ]);
 
                 if (empty($orders)) {
                     $hasMore = false;
                     break;
                 }
 
+                $totalOrdersFetched += count($orders);
+
                 foreach ($orders as $order) {
+                    $orderId = $order['id'];
+                    $orderStatus = $order['status'];
+                    $orderProducts = array_column($order['line_items'] ?? [], 'product_id');
+
+                    Logger::sync('info', "Processing order from WooCommerce", [
+                        'order_id' => $orderId,
+                        'status' => $orderStatus,
+                        'product_ids' => $orderProducts
+                    ]);
+
                     $result = $this->processOrder($order, $planMap);
                     $results[$result['action']]++;
+
+                    Logger::sync('info', "Order processed", [
+                        'order_id' => $orderId,
+                        'action' => $result['action'],
+                        'message' => $result['message'] ?? ''
+                    ]);
 
                     if ($result['action'] === 'error') {
                         $results['details'][] = $result['message'];
@@ -159,7 +194,9 @@ class AutoSyncService {
                 }
             }
 
-            Logger::sync('info', 'Recent auto-sync completed', $results);
+            Logger::sync('info', 'Recent auto-sync completed', array_merge($results, [
+                'total_orders_fetched' => $totalOrdersFetched
+            ]));
 
             // Sincronizar license_keys pendientes a WooCommerce
             $this->syncPendingLicenseKeys($results);
@@ -222,23 +259,33 @@ class AutoSyncService {
                 $orderDate = $order['date_created'] ?? date(DATE_FORMAT);
                 $periodEnds = date(DATE_FORMAT, strtotime($orderDate . ' +1 month'));
 
-                // Verificar si ya existe licencia para este email y plan
+                // Verificar si ya existe licencia para ESTE PEDIDO ESPECÍFICO
+                // Importante: NO buscar por email+plan porque un usuario puede tener múltiples pedidos
                 $existing = $this->db->fetchOne(
-                    "SELECT * FROM " . DB_PREFIX . "licenses WHERE user_email = ? AND plan_id = ?",
-                    [$email, $plan['id']]
+                    "SELECT * FROM " . DB_PREFIX . "licenses
+                     WHERE (last_order_id = ? OR woo_subscription_id = ?)",
+                    [$orderId, $orderId]
                 );
 
+                Logger::sync('info', 'Checking for existing license', [
+                    'order_id' => $orderId,
+                    'email' => $email,
+                    'plan_id' => $plan['id'],
+                    'existing_found' => $existing ? 'yes' : 'no',
+                    'existing_license_key' => $existing ? $existing['license_key'] : null
+                ]);
+
                 if ($existing) {
-                    // Verificar si hay cambios reales
+                    // Ya existe licencia para este pedido - actualizar solo si hay cambios
                     $hasChanges = false;
 
-                    if ($existing['last_order_id'] != $orderId) {
-                        $hasChanges = true;
-                    }
                     if ($existing['tokens_limit'] != $plan['tokens_per_month']) {
                         $hasChanges = true;
                     }
                     if ($existing['status'] !== 'active') {
+                        $hasChanges = true;
+                    }
+                    if ($existing['subscription_price'] != $productPrice) {
                         $hasChanges = true;
                     }
 
@@ -253,7 +300,7 @@ class AutoSyncService {
                         $processed = true;
                         return [
                             'action' => 'unchanged',
-                            'message' => "No changes for license {$existing['license_key']}"
+                            'message' => "No changes for license {$existing['license_key']} (order {$orderId})"
                         ];
                     }
 
@@ -309,8 +356,16 @@ class AutoSyncService {
                     ];
 
                 } else {
-                    // Crear nueva licencia
+                    // Crear nueva licencia para este pedido
+                    // Nota: Un usuario puede tener múltiples licencias (renovaciones, múltiples pedidos, etc.)
                     $licenseKey = $this->generateLicenseKey($plan['id']);
+
+                    Logger::sync('info', 'Creating new license for order', [
+                        'order_id' => $orderId,
+                        'email' => $email,
+                        'plan_id' => $plan['id'],
+                        'new_license_key' => $licenseKey
+                    ]);
 
                     $this->db->insert('licenses', [
                         'license_key' => $licenseKey,
@@ -343,7 +398,8 @@ class AutoSyncService {
                         'license_key' => $licenseKey,
                         'order_id' => $orderId,
                         'email' => $email,
-                        'plan' => $plan['id']
+                        'plan_id' => $plan['id'],
+                        'customer_name' => $customerName
                     ]);
 
                     // Obtener el ID de la licencia recién creada y registrar en sync_logs

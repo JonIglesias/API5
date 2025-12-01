@@ -4028,3 +4028,4 @@
 {"timestamp":"2025-11-27 13:30:06","level":"INFO","message":"Inserting sync summary to sync_logs","context":{"sync_type_value":"cron_recent","source":"cron","syncType":"recent","status":"success","details":"Cron 2h: 0 creadas, 0 actualizadas, 1 sin cambios, 0 errores"}}
 {"timestamp":"2025-11-27 13:30:06","level":"INFO","message":"Cron summary inserted successfully with sync_type: cron_recent","context":[]}
 {"timestamp":"2025-11-27 13:30:06","level":"INFO","message":"Cron auto-sync completed (recent)","context":{"type":"recent","results":{"created":0,"updated":0,"unchanged":1,"errors":0,"skipped":0,"details":[]}}}
+{"timestamp":"2025-11-30 18:25:11","level":"ERROR","message":"Cron auto-sync failed","context":{"error":"Database connection failed"}}

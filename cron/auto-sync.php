@@ -6,9 +6,10 @@
  * con las licencias locales, sin depender de webhooks.
  *
  * Ejecutar cada 5 minutos para que las licencias se generen rápido:
- * */5 * * * * php /path/to/api_claude_5/cron/auto-sync.php
+ * Crontab: star-slash-5 * * * * php /path/to/API5/cron/auto-sync.php
+ * (Reemplazar star-slash con asterisco y barra)
  *
- * @version 1.2
+ * @version 1.3
  */
 
 // Mostrar errores para debugging
