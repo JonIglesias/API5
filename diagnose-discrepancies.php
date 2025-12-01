@@ -48,7 +48,7 @@ foreach ($plans as $plan) {
     echo "  → Tokens: {$plan['tokens_per_month']}\n\n";
 }
 
-echo "✅ {$count} plan(es) configurado(s)\n";
+echo "✅ " . count($plans) . " plan(es) configurado(s)\n";
 echo "Productos mapeados: " . implode(', ', array_keys($planMap)) . "\n\n";
 
 // 2. Obtener pedidos recientes de WooCommerce (últimas 24 horas)
@@ -115,7 +115,8 @@ try {
 
             // Verificar si existe licencia en la base de datos
             $existingLicense = $db->fetchOne("
-                SELECT id, license_key, created_at, license_key_synced_to_woo
+                SELECT id, license_key, created_at, license_key_synced_to_woo,
+                       last_order_id, woo_subscription_id, user_email, plan_id
                 FROM " . DB_PREFIX . "licenses
                 WHERE last_order_id = ? OR woo_subscription_id = ?
             ", [$orderId, $orderId]);
@@ -125,6 +126,11 @@ try {
                 echo "     License Key: {$existingLicense['license_key']}\n";
                 echo "     Creada: {$existingLicense['created_at']}\n";
                 echo "     Sincronizada a WC: " . ($existingLicense['license_key_synced_to_woo'] ? 'Sí' : 'No') . "\n";
+                echo "     🔍 DEBUG:\n";
+                echo "        last_order_id: " . ($existingLicense['last_order_id'] ?? 'NULL') . "\n";
+                echo "        woo_subscription_id: " . ($existingLicense['woo_subscription_id'] ?? 'NULL') . "\n";
+                echo "        user_email: " . ($existingLicense['user_email'] ?? 'NULL') . "\n";
+                echo "        plan_id: " . ($existingLicense['plan_id'] ?? 'NULL') . "\n";
             } else {
                 echo "\n  ❌ NO HAY LICENCIA EN LA BASE DE DATOS\n";
 
