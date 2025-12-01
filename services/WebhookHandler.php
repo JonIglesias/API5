@@ -426,7 +426,7 @@ class WebhookHandler {
 
             } else {
                 // Crear nueva licencia
-                $licenseKey = $this->generateLicenseKey($plan['id']);
+                $licenseKey = $this->generateLicenseKey($orderId, $plan['id']);
 
                 $this->db->insert('licenses', [
                     'license_key' => $licenseKey,
@@ -508,12 +508,13 @@ class WebhookHandler {
 
     /**
      * Generar license key
+     * Formato: {order_id}-{plan_id}-{year}-{random}
+     * Ejemplo: 628-10-2025-83772E2C
      */
-    private function generateLicenseKey($planId) {
-        $prefix = strtoupper(substr($planId, 0, 4));
+    private function generateLicenseKey($orderId, $planId) {
         $year = date('Y');
         $random = strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
-        return "{$prefix}-{$year}-{$random}";
+        return "{$orderId}-{$planId}-{$year}-{$random}";
     }
 
     // ========== HELPERS ==========
