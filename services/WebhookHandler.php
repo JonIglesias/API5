@@ -357,10 +357,11 @@ class WebhookHandler {
             $orderDate = $data['date_created'] ?? date(DATE_FORMAT);
             $periodEnds = date(DATE_FORMAT, strtotime($orderDate . ' +1 month'));
 
-            // Verificar si ya existe licencia para este email y plan
+            // Verificar si ya existe licencia para ESTE PEDIDO ESPECÍFICO
+            // Importante: NO buscar por email+plan porque un usuario puede tener múltiples pedidos
             $existing = $this->db->fetchOne(
-                "SELECT * FROM " . DB_PREFIX . "licenses WHERE user_email = ? AND plan_id = ?",
-                [$email, $plan['id']]
+                "SELECT * FROM " . DB_PREFIX . "licenses WHERE (last_order_id = ? OR woo_subscription_id = ?)",
+                [$orderId, $orderId]
             );
 
             if ($existing) {
