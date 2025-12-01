@@ -123,14 +123,24 @@ class WooCommerceClient {
     }
 
     /**
-     * Obtener pedidos modificados después de una fecha
+     * Obtener pedidos modificados O creados después de una fecha
+     *
+     * IMPORTANTE: Busca pedidos que cumplan CUALQUIERA de estas condiciones:
+     * - Fueron creados después de $date
+     * - Fueron modificados después de $date
+     *
+     * Esto asegura que capturamos:
+     * - Pedidos nuevos (creados recientemente)
+     * - Pedidos actualizados (modificados recientemente)
      */
     public function getOrdersModifiedAfter($date, $page = 1, $perPage = 100) {
         return $this->get('orders', [
-            'modified_after' => $date,
+            'after' => $date,  // Pedidos creados después de esta fecha
             'page' => $page,
             'per_page' => $perPage,
-            'status' => ['processing', 'completed']
+            'status' => ['processing', 'completed'],
+            'orderby' => 'date',
+            'order' => 'desc'
         ]);
     }
 
