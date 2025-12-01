@@ -346,8 +346,28 @@ if (isset($_GET['edit'])) {
                 </div>
                 <div>
                     <p><strong>WooCommerce User ID:</strong> #<?= $viewLicense['woo_user_id'] ?: 'N/A' ?></p>
-                    <p><strong>WooCommerce Subscription ID:</strong> #<?= $viewLicense['woo_subscription_id'] ?: 'N/A' ?></p>
-                    <p><strong>Última Order ID:</strong> #<?= $viewLicense['last_order_id'] ?: 'N/A' ?></p>
+                    <p><strong>WooCommerce Subscription ID:</strong>
+                        <?php if ($viewLicense['woo_subscription_id']): ?>
+                            <a href="https://bocetosmarketing.com/wp-admin/post.php?post=<?= $viewLicense['woo_subscription_id'] ?>&action=edit"
+                               target="_blank"
+                               style="color: #3498db; text-decoration: none; font-weight: 500;">
+                                #<?= $viewLicense['woo_subscription_id'] ?> 🔗
+                            </a>
+                        <?php else: ?>
+                            N/A
+                        <?php endif; ?>
+                    </p>
+                    <p><strong>Última Order ID:</strong>
+                        <?php if ($viewLicense['last_order_id']): ?>
+                            <a href="https://bocetosmarketing.com/wp-admin/post.php?post=<?= $viewLicense['last_order_id'] ?>&action=edit"
+                               target="_blank"
+                               style="color: #3498db; text-decoration: none; font-weight: 500;">
+                                #<?= $viewLicense['last_order_id'] ?> 🔗
+                            </a>
+                        <?php else: ?>
+                            N/A
+                        <?php endif; ?>
+                    </p>
                 </div>
             </div>
             
@@ -613,6 +633,7 @@ if (isset($_GET['edit'])) {
                     <th>License Key</th>
                     <th>Email</th>
                     <th>Plan</th>
+                    <th>Order ID</th>
                     <th>Estado</th>
                     <th>Tokens</th>
                     <th>Vence</th>
@@ -622,7 +643,7 @@ if (isset($_GET['edit'])) {
             <tbody>
                 <?php if (empty($licenses)): ?>
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 40px;">
+                        <td colspan="8" style="text-align: center; padding: 40px;">
                             No hay licencias que mostrar
                         </td>
                     </tr>
@@ -632,6 +653,18 @@ if (isset($_GET['edit'])) {
                             <td><code><?= $license['license_key'] ?></code></td>
                             <td><?= htmlspecialchars($license['user_email']) ?></td>
                             <td><?= $license['plan_name'] ?></td>
+                            <td>
+                                <?php if ($license['last_order_id']): ?>
+                                    <a href="https://bocetosmarketing.com/wp-admin/post.php?post=<?= $license['last_order_id'] ?>&action=edit"
+                                       target="_blank"
+                                       style="color: #3498db; text-decoration: none; font-weight: 500;"
+                                       title="Ver pedido en WooCommerce">
+                                        #<?= $license['last_order_id'] ?> 🔗
+                                    </a>
+                                <?php else: ?>
+                                    <span style="color: #999;">N/A</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <span class="badge badge-<?= $license['status'] ?>">
                                     <?= ucfirst($license['status']) ?>
