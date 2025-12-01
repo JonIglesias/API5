@@ -31,6 +31,10 @@ define('WC_CONSUMER_SECRET', 'cs_4f37ae3fc0acfe9ec749dae9c621eabd1c84afcb');
 // CONFIGURACIÓN DE SINCRONIZACIÓN
 // ============================================================================
 
+// Auto-sync: Período de revisión hacia atrás (en horas)
+// 168 horas = 7 días - Revisa todos los pedidos de los últimos 7 días
+define('SYNC_HOURS_LOOKBACK', 168);
+
 // Intervalo para licencias críticas (segundos)
 define('SYNC_CRITICAL_INTERVAL', 1800); // 30 minutos
 
@@ -45,6 +49,19 @@ define('CRITICAL_DAYS_BEFORE_EXPIRY', 7);
 
 // Edad máxima para considerar una licencia como "nueva" (horas)
 define('NEW_LICENSE_AGE_HOURS', 48);
+
+// Máximo de intentos para sincronizar una licencia a WooCommerce
+define('SYNC_MAX_ATTEMPTS', 5);
+
+// ============================================================================
+// CONFIGURACIÓN DE ALERTAS
+// ============================================================================
+
+// Email para recibir alertas de errores críticos y fallos de sincronización
+define('ALERT_EMAIL', 'jon@bocetos.com');
+
+// Activar alertas por email
+define('ENABLE_ALERTS', true);
 
 // ============================================================================
 // CONFIGURACIÓN DE MONEDA

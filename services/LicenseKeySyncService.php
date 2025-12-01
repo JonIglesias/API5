@@ -13,14 +13,19 @@ defined('API_ACCESS') or die('Direct access not permitted');
 require_once API_BASE_DIR . '/core/WooCommerceClient.php';
 require_once API_BASE_DIR . '/core/Database.php';
 require_once API_BASE_DIR . '/core/Logger.php';
+require_once API_BASE_DIR . '/services/AlertService.php';
 
 class LicenseKeySyncService {
     private $wc;
     private $db;
 
-    // Configuración de reintentos
-    const MAX_ATTEMPTS = 5;              // Máximo 5 intentos
+    // Configuración de reintentos (usar config o fallback)
+    const MAX_ATTEMPTS_FALLBACK = 5;              // Fallback si no está en config
     const RETRY_DELAY_SECONDS = 300;     // 5 minutos entre reintentos
+
+    private function getMaxAttempts() {
+        return defined('SYNC_MAX_ATTEMPTS') ? SYNC_MAX_ATTEMPTS : self::MAX_ATTEMPTS_FALLBACK;
+    }
 
     public function __construct() {
         $this->wc = new WooCommerceClient();
@@ -58,10 +63,22 @@ class LicenseKeySyncService {
         }
 
         // Verificar si debe reintentar (máximo de intentos)
-        if ($license['license_key_sync_attempts'] >= self::MAX_ATTEMPTS && !$forceRetry) {
+        $maxAttempts = $this->getMaxAttempts();
+        if ($license['license_key_sync_attempts'] >= $maxAttempts && !$forceRetry) {
             Logger::sync('warning', 'Max sync attempts reached for license', [
                 'license_id' => $licenseId,
-                'attempts' => $license['license_key_sync_attempts']
+                'attempts' => $license['license_key_sync_attempts'],
+                'max_attempts' => $maxAttempts
+            ]);
+
+            // Enviar alerta por email
+            AlertService::licenseMaxAttemptsReached([
+                'license_id' => $licenseId,
+                'license_key' => $license['license_key'],
+                'user_email' => $license['user_email'],
+                'order_id' => $license['woo_subscription_id'] ?? $license['last_order_id'] ?? null,
+                'attempts' => $license['license_key_sync_attempts'],
+                'last_attempt' => $license['license_key_last_sync_attempt'] ?? 'Never'
             ]);
 
             return [
@@ -173,6 +190,8 @@ class LicenseKeySyncService {
      * @return array Resumen de la sincronización
      */
     public function syncPendingLicenseKeys($limit = 100) {
+        $maxAttempts = $this->getMaxAttempts();
+
         // Obtener licencias que necesitan sincronización
         $licenses = $this->db->query("
             SELECT id, license_key, license_key_sync_attempts, woo_subscription_id, last_order_id
@@ -189,7 +208,7 @@ class LicenseKeySyncService {
               )
             ORDER BY created_at DESC
             LIMIT ?
-        ", [self::MAX_ATTEMPTS, self::RETRY_DELAY_SECONDS, $limit]);
+        ", [$maxAttempts, self::RETRY_DELAY_SECONDS, $limit]);
 
         $results = [
             'total' => count($licenses),
@@ -221,6 +240,7 @@ class LicenseKeySyncService {
      * @return array Estadísticas
      */
     public function getSyncStats() {
+        $maxAttempts = $this->getMaxAttempts();
         $stats = [];
 
         // Total de licencias
@@ -243,14 +263,14 @@ class LicenseKeySyncService {
                   (woo_subscription_id IS NOT NULL AND woo_subscription_id != '' AND woo_subscription_id > 0)
                   OR (last_order_id IS NOT NULL AND last_order_id != '' AND last_order_id > 0)
               )
-        ", [self::MAX_ATTEMPTS])['count'];
+        ", [$maxAttempts])['count'];
 
         // Licencias que alcanzaron el máximo de intentos
         $stats['max_attempts'] = $this->db->fetchOne("
             SELECT COUNT(*) as count FROM " . DB_PREFIX . "licenses
             WHERE license_key_synced_to_woo = 0
               AND license_key_sync_attempts >= ?
-        ", [self::MAX_ATTEMPTS])['count'];
+        ", [$maxAttempts])['count'];
 
         // Licencias sin order_id válido (no se pueden sincronizar)
         $stats['no_order_id'] = $this->db->fetchOne("
