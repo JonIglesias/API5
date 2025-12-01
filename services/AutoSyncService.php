@@ -17,6 +17,7 @@ require_once API_BASE_DIR . '/models/License.php';
 require_once API_BASE_DIR . '/models/Plan.php';
 require_once API_BASE_DIR . '/services/TokenManager.php';
 require_once API_BASE_DIR . '/services/LicenseKeySyncService.php';
+require_once API_BASE_DIR . '/services/AlertService.php';
 
 class AutoSyncService {
     private $wc;
@@ -96,10 +97,22 @@ class AutoSyncService {
             // Sincronizar license_keys pendientes a WooCommerce
             $this->syncPendingLicenseKeys($results);
 
+            // Verificar y alertar sobre licencias con problemas
+            AlertService::checkAndAlertPendingLicenses();
+
         } catch (Exception $e) {
             Logger::sync('error', 'Auto-sync failed', ['error' => $e->getMessage()]);
             $results['errors']++;
             $results['details'][] = $e->getMessage();
+
+            // Enviar alerta de error crítico
+            AlertService::autoSyncFailed([
+                'type' => 'full_sync',
+                'message' => $e->getMessage(),
+                'context' => [
+                    'trace' => $e->getTraceAsString()
+                ]
+            ]);
         }
 
         return $results;
@@ -201,10 +214,22 @@ class AutoSyncService {
             // Sincronizar license_keys pendientes a WooCommerce
             $this->syncPendingLicenseKeys($results);
 
+            // Verificar y alertar sobre licencias con problemas
+            AlertService::checkAndAlertPendingLicenses();
+
         } catch (Exception $e) {
             Logger::sync('error', 'Recent auto-sync failed', ['error' => $e->getMessage()]);
             $results['errors']++;
             $results['details'][] = $e->getMessage();
+
+            // Enviar alerta de error crítico
+            AlertService::autoSyncFailed([
+                'type' => 'recent_sync',
+                'message' => $e->getMessage(),
+                'context' => [
+                    'trace' => $e->getTraceAsString()
+                ]
+            ]);
         }
 
         return $results;

@@ -62,8 +62,10 @@ try {
         output("Running FULL sync of all orders...");
         $results = $autoSync->syncAll();
     } else {
-        output("Running RECENT sync (last 2 hours)...");
-        $results = $autoSync->syncRecent(2);
+        $hours = defined('SYNC_HOURS_LOOKBACK') ? SYNC_HOURS_LOOKBACK : 168;
+        $days = round($hours / 24, 1);
+        output("Running RECENT sync (last {$hours} hours / {$days} days)...");
+        $results = $autoSync->syncRecent($hours);
     }
 
     output("");
